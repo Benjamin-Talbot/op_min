@@ -1,0 +1,25 @@
+ssh -i ~/.ssh/id_rsa_ccdb btalbot@trillium-gpu.alliancecan.ca
+
+transfer files
+
+module load python/3.11.5
+module load cuda/12.9
+
+python -m venv ~/envs/qubo
+source ~/envs/qubo/bin/activate
+python -m venv $SCRATCH/~envs/qenv
+source $SCRATCH/~envs/qenv/bin/activate
+
+pip install --upgrade pip setuptools wheel
+
+salloc --time=0:10:0 --mem=8G
+
+pip install -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt
+pip install -r /home/btalbot/links/projects/def-stijn/btalbot/op_min/requirements.txt
+cat /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt
+
+python /home/btalbot/projects/def-stijn/btalbot/op_min/h2.py
+
+sbatch script.sh
+
+squeue -u $USER

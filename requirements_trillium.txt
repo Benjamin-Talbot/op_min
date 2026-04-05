@@ -1,0 +1,5 @@
+qiskit --no-index
+qiskit-aer --no-index
+qiskit-optimization --no-index
+qiskit-ibm-runtime --no-index
+numpy --no-index

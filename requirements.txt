@@ -1,0 +1,5 @@
+qiskit --no-index
+qiskit-aer-gpu==0.17.2 --no-index
+qiskit-optimization==0.7.0 --no-index
+qiskit-ibm-runtime==0.44.0 --no-index
+numpy==1.26.4 --no-index

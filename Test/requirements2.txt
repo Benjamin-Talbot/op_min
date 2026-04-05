@@ -1,0 +1,17 @@
+seaborn==0.13.2
+setuptools==80.9.0
+six==1.17.0
+sortedcontainers==2.4.0
+stack_data==0.6.3
+stevedore==5.6.0
+symengine==0.13.0
+sympy==1.14.0
+tornado==6.5.4
+tqdm==4.67.3
+traitlets==5.14.3
+typing_extensions==4.15.0
+typing-inspection==0.4.2
+tzdata==2025.3
+urllib3==2.6.3
+wcwidth==0.2.14
+wheel==0.45.1

@@ -1,0 +1,194 @@
+[btalbot@tri-login03 op_min]$ cat /scratch/btalbot/jobs/job_1277075.err
+/var/spool/slurm/slurmd/job1277075/slurm_script: line 31: 2871478 Killed                  python ~/links/projects/def-stijn/btalbot/op_min/beh2_bk.py
+[2026-04-03T18:31:44.873] error: Detected 1 oom_kill event in StepId=1277075.batch. Some of the step tasks have been OOM Killed.
+[btalbot@tri-login03 op_min]$ cat /scratch/btalbot/jobs/job_1277075.out
+
+scontrol show job 1277075
+JobId=1277075 JobName=qaoa_mps
+   UserId=btalbot(3158264) GroupId=btalbot(3158264) MCS_label=N/A
+   Priority=1576735 Nice=0 Account=def-stijn QOS=normal
+   JobState=COMPLETING Reason=OutOfMemory Dependency=(null)
+   Requeue=0 Restarts=0 BatchFlag=1 Reboot=0 ExitCode=0:125
+   RunTime=00:58:10 TimeLimit=04:00:00 TimeMin=N/A
+   SubmitTime=2026-04-03T17:33:35 EligibleTime=2026-04-03T17:33:35
+   AccrueTime=2026-04-03T17:33:35
+   StartTime=2026-04-03T17:33:36 EndTime=2026-04-03T18:31:46 Deadline=N/A
+   SuspendTime=None SecsPreSuspend=0 LastSchedEval=2026-04-03T17:33:36 Scheduler=Main
+   Partition=compute AllocNode:Sid=tri-login03:1826480
+   ReqNodeList=(null) ExcNodeList=(null)
+   NodeList=tri0118
+   BatchHost=tri0118
+   NumNodes=1 NumCPUs=192 NumTasks=1 CPUs/Task=192 ReqB:S:C:T=0:0:*:*
+   ReqTRES=cpu=192,mem=767000M,node=1,billing=192
+   AllocTRES=cpu=192,mem=767000M,node=1,billing=192
+   Socks/Node=* NtasksPerN:B:S:C=0:0:*:* CoreSpec=*
+   MinCPUsNode=192 MinMemoryNode=767000M MinTmpDiskNode=0
+   Features=(null) DelayBoot=00:00:00
+   OverSubscribe=NO Contiguous=0 Licenses=(null) LicensesAlloc=(null) Network=(null)
+   Command=/project/def-stijn/btalbot/op_min/scripts/beh2_bk.sh
+   SubmitLine=SBATCH --comment /opt/slurm/bin/sbatch --export=NONE --get-user-env scripts/beh2_bk.sh --export=NONE --get-user-env scripts/beh2_bk.sh
+   WorkDir=/project/def-stijn/btalbot/op_min
+   Comment=/opt/slurm/bin/sbatch --export=NONE --get-user-env scripts/beh2_bk.sh
+   StdErr=/scratch/btalbot/jobs/job_1277075.err
+   StdIn=/dev/null
+   StdOut=/scratch/btalbot/jobs/job_1277075.out
+   TresPerTask=cpu=192
+
+sacct -j 1277075
+JobID           JobName    Account    Elapsed  MaxVMSize     MaxRSS  SystemCPU    UserCPU ExitCode 
+------------ ---------- ---------- ---------- ---------- ---------- ---------- ---------- -------- 
+1277075        qaoa_mps  def-stijn   00:58:11                         00:00:00   00:00:00      0:0 
+1277075.bat+      batch  def-stijn   00:58:11                         00:00:00   00:00:00      0:0 
+1277075.ext+     extern  def-stijn   00:58:11                         00:00:00   00:00:00      0:0 
+
+
+kernel messages produced during job executions:
+[Apr 3 18:30] irqbalance invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+[  +0.000014] CPU: 190 PID: 3260 Comm: irqbalance Tainted: G S         OE      ------  ---  5.14.0-611.36.1.el9_7.x86_64 #1
+[  +0.000004] Hardware name: Lenovo ThinkSystem SD665 V3/SB27B96517, BIOS QGE140H-8.21 05/14/2025
+[  +0.000002] Call Trace:
+[  +0.000004]  <TASK>
+[  +0.000003]  dump_stack_lvl+0x34/0x48
+[  +0.000008]  dump_header+0x49/0x212
+[  +0.000004]  oom_kill_process.cold+0xb/0x10
+[  +0.000002]  out_of_memory+0xee/0x2b0
+[  +0.000005]  __alloc_pages_slowpath.constprop.0+0x793/0xb10
+[  +0.000005]  __alloc_pages+0x21c/0x250
+[  +0.000003]  alloc_pages_mpol+0x93/0x1e0
+[  +0.000004]  ? filemap_get_entry+0xe3/0x140
+[  +0.000003]  folio_alloc+0x12/0x30
+[  +0.000001]  __filemap_get_folio+0x189/0x2e0
+[  +0.000002]  filemap_fault+0x4d5/0x8b0
+[  +0.000002]  __do_fault+0x31/0x150
+[  +0.000003]  do_read_fault+0x11e/0x1d0
+[  +0.000002]  do_pte_missing+0x157/0x200
+[  +0.000002]  __handle_mm_fault+0x2fe/0x650
+[  +0.000002]  handle_mm_fault+0xfb/0x270
+[  +0.000001]  do_user_addr_fault+0x215/0x620
+[  +0.000004]  exc_page_fault+0x61/0x150
+[  +0.000004]  asm_exc_page_fault+0x22/0x30
+[  +0.000006] RIP: 0033:0x7f1bc1c123cd
+[  +0.000008] Code: Unable to access opcode bytes at 0x7f1bc1c123a3.
+[  +0.000001] RSP: 002b:00007ffd42fa7e40 EFLAGS: 00010297
+[  +0.000002] RAX: 0000000000000027 RBX: 0000000000000025 RCX: 000055cb1a4ae44b
+[  +0.000001] RDX: 000055cb1a4ae44a RSI: 00007f1bc1d61f7c RDI: fffffffbfffffff6
+[  +0.000000] RBP: 00007ffd42fa8540 R08: 0000000000000000 R09: 0000000000000000
+[  +0.000000] R10: 00007f1bc1d4fac0 R11: 00007f1bc1d503c0 R12: 0000000000000000
+[  +0.000001] R13: 00007ffd42fa8570 R14: 000055cb1a4ae449 R15: 0000000000000000
+[  +0.000001]  </TASK>
+[  +0.000000] Mem-Info:
+[  +0.000026] active_anon:72930361 inactive_anon:123027148 isolated_anon:0
+               active_file:131 inactive_file:359 isolated_file:0
+               unevictable:768 dirty:0 writeback:0
+               slab_reclaimable:68067 slab_unreclaimable:268739
+               mapped:4048 shmem:444805 pagetables:384114
+               sec_pagetables:1154 bounce:0
+               kernel_misc_reclaimable:0
+               free:152390 free_pcp:248 free_cma:0
+[  +0.000003] Node 0 active_anon:95216796kB inactive_anon:1660532kB active_file:0kB inactive_file:468kB unevictable:3072kB isolated(anon):0kB isolated(file):0kB mapped:3416kB dirty:0kB writeback:0kB shmem:1492084kB shmem_thp:0kB shmem_pmdmapped:0kB anon_thp:2967552kB writeback_tmp:0kB kernel_stack:6160kB pagetables:157880kB sec_pagetables:2620kB all_unreclaimable? yes
+[  +0.000002] Node 1 active_anon:4083660kB inactive_anon:94427472kB active_file:0kB inactive_file:1032kB unevictable:0kB isolated(anon):0kB isolated(file):0kB mapped:5532kB dirty:0kB writeback:0kB shmem:8420kB shmem_thp:0kB shmem_pmdmapped:0kB anon_thp:18432kB writeback_tmp:0kB kernel_stack:4020kB pagetables:217280kB sec_pagetables:332kB all_unreclaimable? yes
+[  +0.000002] Node 2 active_anon:98191240kB inactive_anon:421816kB active_file:216kB inactive_file:176kB unevictable:0kB isolated(anon):0kB isolated(file):0kB mapped:12kB dirty:0kB writeback:0kB shmem:76kB shmem_thp:0kB shmem_pmdmapped:0kB anon_thp:24576kB writeback_tmp:0kB kernel_stack:4112kB pagetables:196796kB sec_pagetables:548kB all_unreclaimable? yes
+[  +0.000002] Node 3 active_anon:1607980kB inactive_anon:96562852kB active_file:672kB inactive_file:0kB unevictable:0kB isolated(anon):0kB isolated(file):0kB mapped:0kB dirty:0kB writeback:0kB shmem:28kB shmem_thp:0kB shmem_pmdmapped:0kB anon_thp:8192kB writeback_tmp:0kB kernel_stack:3732kB pagetables:195528kB sec_pagetables:548kB all_unreclaimable? yes
+[  +0.000001] Node 4 active_anon:468372kB inactive_anon:98128868kB active_file:92kB inactive_file:868kB unevictable:0kB isolated(anon):0kB isolated(file):0kB mapped:244kB dirty:0kB writeback:0kB shmem:280kB shmem_thp:0kB shmem_pmdmapped:0kB anon_thp:28672kB writeback_tmp:0kB kernel_stack:4180kB pagetables:193624kB sec_pagetables:276kB all_unreclaimable? yes
+[  +0.000001] Node 5 active_anon:25409480kB inactive_anon:70662752kB active_file:72kB inactive_file:120kB unevictable:0kB isolated(anon):0kB isolated(file):0kB mapped:7896kB dirty:0kB writeback:0kB shmem:278044kB shmem_thp:0kB shmem_pmdmapped:0kB anon_thp:22528kB writeback_tmp:0kB kernel_stack:5208kB pagetables:188056kB sec_pagetables:204kB all_unreclaimable? yes
+[  +0.000002] Node 6 active_anon:66682340kB inactive_anon:31884436kB active_file:516kB inactive_file:0kB unevictable:0kB isolated(anon):0kB isolated(file):0kB mapped:160kB dirty:0kB writeback:0kB shmem:80kB shmem_thp:0kB shmem_pmdmapped:0kB anon_thp:124928kB writeback_tmp:0kB kernel_stack:4140kB pagetables:193684kB sec_pagetables:44kB all_unreclaimable? yes
+[  +0.000001] Node 7 active_anon:61576kB inactive_anon:98359864kB active_file:312kB inactive_file:0kB unevictable:0kB isolated(anon):0kB isolated(file):0kB mapped:216kB dirty:0kB writeback:0kB shmem:208kB shmem_thp:0kB shmem_pmdmapped:0kB anon_thp:14336kB writeback_tmp:0kB kernel_stack:4672kB pagetables:193608kB sec_pagetables:44kB all_unreclaimable? yes
+[  +0.000002] Node 0 DMA free:11264kB boost:0kB min:4kB low:16kB high:28kB reserved_highatomic:0KB active_anon:0kB inactive_anon:0kB active_file:0kB inactive_file:0kB unevictable:0kB writepending:0kB present:15996kB managed:15360kB mlocked:0kB bounce:0kB free_pcp:0kB local_pcp:0kB free_cma:0kB
+[  +0.000003] lowmem_reserve[]: 0 2321 96219 96219 96219
+[  +0.000002] Node 0 DMA32 free:376092kB boost:0kB min:676kB low:3052kB high:5428kB reserved_highatomic:0KB active_anon:2032592kB inactive_anon:10564kB active_file:4kB inactive_file:28kB unevictable:0kB writepending:0kB present:2498320kB managed:2430128kB mlocked:0kB bounce:0kB free_pcp:248kB local_pcp:0kB free_cma:0kB
+[  +0.000002] lowmem_reserve[]: 0 0 93897 93897 93897
+[  +0.000002] Node 0 Normal free:27172kB boost:0kB min:27348kB low:123496kB high:219644kB reserved_highatomic:0KB active_anon:93184232kB inactive_anon:1649940kB active_file:0kB inactive_file:1252kB unevictable:3072kB writepending:0kB present:97779648kB managed:96157628kB mlocked:0kB bounce:0kB free_pcp:496kB local_pcp:0kB free_cma:0kB
+[  +0.000002] lowmem_reserve[]: 0 0 0 0 0
+[  +0.000002] Node 1 Normal free:27732kB boost:0kB min:28180kB low:127264kB high:226348kB reserved_highatomic:0KB active_anon:4083660kB inactive_anon:94427472kB active_file:0kB inactive_file:1032kB unevictable:0kB writepending:0kB present:100663296kB managed:99084040kB mlocked:0kB bounce:0kB free_pcp:0kB local_pcp:0kB free_cma:0kB
+[  +0.000001] lowmem_reserve[]: 0 0 0 0 0
+[  +0.000002] Node 2 Normal free:27892kB boost:0kB min:28180kB low:127264kB high:226348kB reserved_highatomic:0KB active_anon:98191240kB inactive_anon:421816kB active_file:216kB inactive_file:176kB unevictable:0kB writepending:0kB present:100663296kB managed:99084044kB mlocked:0kB bounce:0kB free_pcp:248kB local_pcp:0kB free_cma:0kB
+[  +0.000001] lowmem_reserve[]: 0 0 0 0 0
+[  +0.000002] Node 3 Normal free:28164kB boost:0kB min:28180kB low:127264kB high:226348kB reserved_highatomic:0KB active_anon:1607980kB inactive_anon:96562852kB active_file:672kB inactive_file:0kB unevictable:0kB writepending:0kB present:100663296kB managed:99084040kB mlocked:0kB bounce:0kB free_pcp:0kB local_pcp:0kB free_cma:0kB
+[  +0.000002] lowmem_reserve[]: 0 0 0 0 0
+[  +0.000001] Node 4 Normal free:27912kB boost:0kB min:28180kB low:127264kB high:226348kB reserved_highatomic:0KB active_anon:468372kB inactive_anon:98128868kB active_file:92kB inactive_file:868kB unevictable:0kB writepending:0kB present:100663296kB managed:99084044kB mlocked:0kB bounce:0kB free_pcp:0kB local_pcp:0kB free_cma:0kB
+[  +0.000001] lowmem_reserve[]: 0 0 0 0 0
+[  +0.000002] Node 5 Normal free:27840kB boost:0kB min:28180kB low:127264kB high:226348kB reserved_highatomic:0KB active_anon:25409480kB inactive_anon:70662752kB active_file:72kB inactive_file:120kB unevictable:0kB writepending:0kB present:100663296kB managed:99084040kB mlocked:0kB bounce:0kB free_pcp:0kB local_pcp:0kB free_cma:0kB
+[  +0.000001] lowmem_reserve[]: 0 0 0 0 0
+[  +0.000002] Node 6 Normal free:27916kB boost:0kB min:28180kB low:127264kB high:226348kB reserved_highatomic:0KB active_anon:66682340kB inactive_anon:31884436kB active_file:516kB inactive_file:0kB unevictable:0kB writepending:0kB present:100663296kB managed:99084044kB mlocked:0kB bounce:0kB free_pcp:0kB local_pcp:0kB free_cma:0kB
+[  +0.000001] lowmem_reserve[]: 0 0 0 0 0
+[  +0.000002] Node 7 Normal free:27576kB boost:0kB min:28156kB low:127152kB high:226148kB reserved_highatomic:0KB active_anon:61576kB inactive_anon:98359864kB active_file:312kB inactive_file:0kB unevictable:0kB writepending:0kB present:100594432kB managed:98999312kB mlocked:0kB bounce:0kB free_pcp:0kB local_pcp:0kB free_cma:0kB
+[  +0.000001] lowmem_reserve[]: 0 0 0 0 0
+[  +0.000001] Node 0 DMA: 0*4kB 0*8kB 0*16kB 0*32kB 0*64kB 0*128kB 0*256kB 0*512kB 1*1024kB (U) 1*2048kB (M) 2*4096kB (M) = 11264kB
+[  +0.000003] Node 0 DMA32: 2*4kB (UM) 0*8kB 1*16kB (U) 3*32kB (ME) 11*64kB (UME) 34*128kB (UME) 31*256kB (UE) 21*512kB (UME) 8*1024kB (UME) 6*2048kB (UE) 81*4096kB (UME) = 376120kB
+[  +0.000004] Node 0 Normal: 40*4kB (UME) 362*8kB (UME) 288*16kB (UME) 562*32kB (UME) 5*64kB (ME) 0*128kB 1*256kB (M) 0*512kB 1*1024kB (M) 0*2048kB 0*4096kB = 27248kB
+[  +0.000004] Node 1 Normal: 1050*4kB (UME) 413*8kB (UME) 89*16kB (UME) 345*32kB (UME) 55*64kB (UME) 14*128kB (UME) 0*256kB 1*512kB (M) 0*1024kB 1*2048kB (M) 0*4096kB = 27840kB
+[  +0.000003] Node 2 Normal: 698*4kB (UME) 475*8kB (UME) 58*16kB (UME) 338*32kB (UME) 91*64kB (UME) 18*128kB (UME) 0*256kB 0*512kB 0*1024kB 1*2048kB (M) 0*4096kB = 28512kB
+[  +0.000004] Node 3 Normal: 1354*4kB (UME) 626*8kB (UME) 273*16kB (UME) 264*32kB (UME) 91*64kB (UME) 0*128kB 0*256kB 0*512kB 0*1024kB 0*2048kB 0*4096kB = 29064kB
+[  +0.000003] Node 4 Normal: 825*4kB (UME) 529*8kB (UME) 81*16kB (UME) 273*32kB (UME) 53*64kB (UME) 62*128kB (UM) 0*256kB 0*512kB 0*1024kB 0*2048kB 0*4096kB = 28892kB
+[  +0.000003] Node 5 Normal: 549*4kB (UME) 505*8kB (UME) 191*16kB (UME) 199*32kB (UME) 78*64kB (UME) 32*128kB (UME) 9*256kB (UM) 0*512kB 0*1024kB 1*2048kB (M) 0*4096kB = 29100kB
+[  +0.000003] Node 6 Normal: 838*4kB (UME) 565*8kB (UME) 81*16kB (UME) 379*32kB (UME) 101*64kB (UM) 2*128kB (M) 0*256kB 1*512kB (M) 0*1024kB 0*2048kB 0*4096kB = 28528kB
+[  +0.000003] Node 7 Normal: 628*4kB (UME) 338*8kB (UME) 87*16kB (UME) 429*32kB (UME) 69*64kB (UME) 7*128kB (UM) 2*256kB (M) 1*512kB (M) 0*1024kB 1*2048kB (M) 0*4096kB = 28720kB
+[  +0.000004] Node 0 hugepages_total=0 hugepages_free=0 hugepages_surp=0 hugepages_size=1048576kB
+[  +0.000000] Node 0 hugepages_total=0 hugepages_free=0 hugepages_surp=0 hugepages_size=2048kB
+[  +0.000001] Node 1 hugepages_total=0 hugepages_free=0 hugepages_surp=0 hugepages_size=1048576kB
+[  +0.000000] Node 1 hugepages_total=0 hugepages_free=0 hugepages_surp=0 hugepages_size=2048kB
+[  +0.000001] Node 2 hugepages_total=0 hugepages_free=0 hugepages_surp=0 hugepages_size=1048576kB
+[  +0.000000] Node 2 hugepages_total=0 hugepages_free=0 hugepages_surp=0 hugepages_size=2048kB
+[  +0.000001] Node 3 hugepages_total=0 hugepages_free=0 hugepages_surp=0 hugepages_size=1048576kB
+[  +0.000000] Node 3 hugepages_total=0 hugepages_free=0 hugepages_surp=0 hugepages_size=2048kB
+[  +0.000000] Node 4 hugepages_total=0 hugepages_free=0 hugepages_surp=0 hugepages_size=1048576kB
+[  +0.000001] Node 4 hugepages_total=0 hugepages_free=0 hugepages_surp=0 hugepages_size=2048kB
+[  +0.000000] Node 5 hugepages_total=0 hugepages_free=0 hugepages_surp=0 hugepages_size=1048576kB
+[  +0.000000] Node 5 hugepages_total=0 hugepages_free=0 hugepages_surp=0 hugepages_size=2048kB
+[  +0.000000] Node 6 hugepages_total=0 hugepages_free=0 hugepages_surp=0 hugepages_size=1048576kB
+[  +0.000001] Node 6 hugepages_total=0 hugepages_free=0 hugepages_surp=0 hugepages_size=2048kB
+[  +0.000000] Node 7 hugepages_total=0 hugepages_free=0 hugepages_surp=0 hugepages_size=1048576kB
+[  +0.000000] Node 7 hugepages_total=0 hugepages_free=0 hugepages_surp=0 hugepages_size=2048kB
+[  +0.000001] 444452 total pagecache pages
+[  +0.000000] 0 pages in swap cache
+[  +0.000001] Free swap  = 0kB
+[  +0.000000] Total swap = 0kB
+[  +0.000000] 201217043 pages RAM
+[  +0.000001] 0 pages HighMem/MovableOnly
+[  +0.000000] 3190373 pages reserved
+[  +0.000000] 0 pages cma reserved
+[  +0.000000] 0 pages hwpoisoned
+[  +0.000001] Tasks state (memory values in pages):
+[  +0.000000] [  pid  ]   uid  tgid total_vm      rss pgtables_bytes swapents oom_score_adj name
+[  +0.000027] [   2701]     0  2701    11293     9216   122880        0          -250 systemd-journal
+[  +0.000003] [   2744]    32  2744     3689      384    69632        0             0 rpcbind
+[  +0.000001] [   2762]     0  2762    13118      384   102400        0         -1000 systemd-udevd
+[  +0.000002] [   3255]    81  3255     2676        0    61440        0          -900 dbus-broker-lau
+[  +0.000002] [   3256]    81  3256     1287        0    49152        0          -900 dbus-broker
+[  +0.000001] [   3257]     0  3257   118856    18432   139264        0             0 NetworkManager
+[  +0.000001] [   3260]     0  3260    20838     9984    65536        0             0 irqbalance
+[  +0.000001] [   3270]     0  3270     5035     1152    77824        0             0 systemd-logind
+[  +0.000001] [   3327]     0  3327   119256    20736   135168        0             0 tuned
+[  +0.000001] [   3330]     0  3330    68095        0    81920        0             0 gssproxy
+[  +0.000001] [   3339]     0  3339    55340        0    49152        0             0 agetty
+[  +0.000001] [   3340]     0  3340    55351        0    45056        0             0 agetty
+[  +0.000001] [   3586]   997  3586   729754     1920   262144        0             0 polkitd
+[  +0.000001] [   4212]    29  4212     2939        0    57344        0             0 rpc.statd
+[  +0.000001] [   4281]     0  4281    45350    12288   110592        0             0 rsyslogd
+[  +0.000001] [   4300]   998  4300    21162     3456    69632        0             0 chronyd
+[  +0.000001] [   4393]     0  4393   102139      384   139264        0             0 automount
+[  +0.000001] [   4586]     0  4586   307919     4229   135168        0             0 utilcpu
+[  +0.000001] [   4619]     0  4619     8302      768    86016        0         -1000 sshd
+[  +0.000001] [   4643]     0  4643    55729      384    57344        0             0 likwid-collecto
+[  +0.000000] [   4711]     0  4711   310507    10752   135168        0             0 node_exporter
+[  +0.000001] [   7241]     0  7241     1756        0    49152        0          -999 slurmstepd
+[  +0.000003] [ 644589]     0 644589     4616        0    65536        0             0 cvmfs2
+[  +0.000001] [ 644593]     0 644593   134846    11134   200704        0             0 cvmfs2
+[  +0.000004] [2426191]     0 2426191    67723     1920   118784        0             0 sssd
+[  +0.000001] [2426194]     0 2426194    72859    12619   163840        0             0 sssd_be
+[  +0.000001] [2426195]     0 2426195    73382    10830   176128        0             0 sssd_nss
+[  +0.000001] [2426196]     0 2426196    64947     1920   106496        0             0 sssd_pam
+[  +0.000001] [2426211]   993 2426211    52854     8448    86016        0             0 munged
+[  +0.000001] [2426220]     0 2426220   424077     1920   245760        0             0 slurmd
+[  +0.000001] [2499254]     0 2499254     4616        0    69632        0             0 cvmfs2
+[  +0.000000] [2499260]     0 2499260  2548662    64512  1400832        0             0 cvmfs2
+[  +0.000003] [2871311]     0 2871311   117678     6144   118784        0          -999 slurmstepd
+[  +0.000001] [2871422]     0 2871422   134148     5760   122880        0          -999 slurmstepd
+[  +0.000001] [2871431] 3158264 2871431    55715      384    69632        0             0 slurm_script
+[  +0.000001] [2871478] 3158264 2871478 195712041 195431355 1568264192        0             0 python
+[  +0.000001] [2871481] 3158264 2871481    49324    10368   126976        0             0 orted
+[  +0.000002] [2874539]     0 2874539     8936     7296    86016        0             0 systemd-tmpfile
+[  +0.000002] [2874673]     0 2874673     7141     4608    90112        0             0 likwid-perfctr
+[  +0.000001] oom-kill:constraint=CONSTRAINT_NONE,nodemask=(null),cpuset=irqbalance.service,mems_allowed=0-7,global_oom,task_memcg=/system.slice/slurmstepd.scope/job_1277075/step_batch/user/task_0,task=python,pid=2871478,uid=3158264
+[  +0.000023] Out of memory: Killed process 2871478 (python) total-vm:782848164kB, anon-rss:781620972kB, file-rss:101376kB, shmem-rss:3072kB, UID:3158264 pgtables:1531508kB oom_score_adj:0
+[Apr 3 18:31] oom_reaper: reaped process 2871478 (python), now anon-rss:648kB, file-rss:101376kB, shmem-rss:1148kB

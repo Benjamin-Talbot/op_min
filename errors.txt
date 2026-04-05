@@ -1,0 +1,236 @@
+(qubo) [btalbot@siku104 ~]$ pip install -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt
+Looking in links: /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v4, /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v3, /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic, /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/annotated_types-0.7.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 1))
+Collecting appnope==0.1.4 (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 2))
+  Obtaining dependency information for appnope==0.1.4 from https://files.pythonhosted.org/packages/81/29/5ecc3a15d5a33e31b26c11426c45c501e439cb865d0bff96315d86443b78/appnope-0.1.4-py2.py3-none-any.whl.metadata
+  Using cached appnope-0.1.4-py2.py3-none-any.whl.metadata (908 bytes)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/asttokens-3.0.1+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 3))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/attrs-26.1.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 4))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/cached_property-1.5.2+computecanada-py2.py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 5))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/certifi-2026.1.4+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 6))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic/cffi-2.0.0+computecanada-cp311-cp311-linux_x86_64.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 7))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/charset_normalizer-3.4.4+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 8))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/cirq_core-1.6.1+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 9))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/comm-0.2.3+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 10))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic/contourpy-1.3.3+computecanada-cp311-cp311-linux_x86_64.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 11))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic/cryptography-46.0.3+computecanada-cp311-abi3-linux_x86_64.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 12))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/cycler-0.12.1+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 13))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v3/debugpy-1.8.19+computecanada-cp311-cp311-linux_x86_64.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 14))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/decorator-5.2.1+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 15))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/deprecation-2.1.0+computecanada-py2.py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 16))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/dill-0.4.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 17))
+Collecting docplex==2.32.262 (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 18))
+  Using cached docplex-2.32.262.tar.gz (660 kB)
+  Installing build dependencies ... done
+  Getting requirements to build wheel ... done
+  Preparing metadata (pyproject.toml) ... done
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/duet-0.2.9+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 19))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/executing-2.2.1+computecanada-py2.py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 20))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/fonttools-4.61.1+computecanada-cp311-cp311-linux_x86_64.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 21))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v3/h5py-3.15.0+computecanada-cp311-cp311-linux_x86_64.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 22))
+Collecting hashable-list==0.2.0 (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 23))
+  Obtaining dependency information for hashable-list==0.2.0 from https://files.pythonhosted.org/packages/f9/50/c34966207b3fc16b22da1ccb22f314600c0ff51aca34c601a02d5f55df6a/hashable_list-0.2.0-py3-none-any.whl.metadata
+  Downloading hashable_list-0.2.0-py3-none-any.whl.metadata (1.2 kB)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/ibm_cloud_sdk_core-3.24.2+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 24))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/ibm_platform_services-0.72.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 25))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/idna-3.11+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 26))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/iniconfig-2.3.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 27))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/ipykernel-7.1.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 28))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/ipython-9.9.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 29))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/ipython_pygments_lexers-1.1.1+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 30))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/jedi-0.19.2+computecanada-py2.py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 31))
+Collecting jupyter_client==8.7.0 (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 32))
+  Obtaining dependency information for jupyter_client==8.7.0 from https://files.pythonhosted.org/packages/bb/f5/fddaec430367be9d62a7ed125530e133bfd4a1c0350fe221149ee0f2b526/jupyter_client-8.7.0-py3-none-any.whl.metadata
+  Downloading jupyter_client-8.7.0-py3-none-any.whl.metadata (8.3 kB)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/jupyter_core-5.9.1+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 33))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/kiwisolver-1.4.9+computecanada-cp311-cp311-linux_x86_64.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 34))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic/matplotlib-3.10.8+computecanada-cp311-cp311-linux_x86_64.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 35))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/matplotlib_inline-0.2.1+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 36))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/mpmath-1.3.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 37))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/nest_asyncio-1.6.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 38))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/networkx-3.6.1+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 39))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic/numpy-1.26.4+computecanada-cp311-cp311-linux_x86_64.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 40))
+Collecting openfermion==1.7.1 (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 41))
+  Obtaining dependency information for openfermion==1.7.1 from https://files.pythonhosted.org/packages/b4/39/28f89ae6516fe327e22ea2f8162c0f83f6d580a8ca00a47447b4473571e3/openfermion-1.7.1-py3-none-any.whl.metadata
+  Downloading openfermion-1.7.1-py3-none-any.whl.metadata (13 kB)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/openfermionpyscf-0.5+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 42))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/ordered_set-4.1.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 43))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/packaging-25.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 44))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v3/pandas-2.3.3+computecanada-cp311-cp311-linux_x86_64.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 45))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/parso-0.8.5+computecanada-py2.py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 46))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/pexpect-4.9.0+computecanada-py2.py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 47))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v3/pillow-12.1.0+computecanada-cp311-cp311-linux_x86_64.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 48))
+Collecting pip==25.3 (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 49))
+  Obtaining dependency information for pip==25.3 from https://files.pythonhosted.org/packages/44/3c/d717024885424591d5376220b5e836c2d5293ce2011523c9de23ff7bf068/pip-25.3-py3-none-any.whl.metadata
+  Downloading pip-25.3-py3-none-any.whl.metadata (4.7 kB)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/platformdirs-4.5.1+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 50))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/pluggy-1.6.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 51))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/prompt_toolkit-3.0.52+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 52))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic/psutil-7.2.1+computecanada-cp36-abi3-linux_x86_64.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 53))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/ptyprocess-0.7.0+computecanada-py2.py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 54))
+Collecting PubChemPy==1.0.5 (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 55))
+  Obtaining dependency information for PubChemPy==1.0.5 from https://files.pythonhosted.org/packages/6b/e3/2c887645f21b94d992a16775bcf81cdf6dcc36cf1606782cb2a3c86e9a35/pubchempy-1.0.5-py3-none-any.whl.metadata
+  Downloading pubchempy-1.0.5-py3-none-any.whl.metadata (4.3 kB)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/pure_eval-0.2.3+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 56))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/pycparser-2.23+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 57))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/pydantic-2.12.5+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 58))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v3/pydantic_core-2.41.5+computecanada-cp311-cp311-linux_x86_64.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 59))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/pydot-4.0.1+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 60))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/pygments-2.19.2+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 61))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/PyJWT-2.10.1+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 62))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/pylatexenc-2.10+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 63))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/pyparsing-3.3.1+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 64))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v3/pyscf-2.11.0+computecanada-py3-none-linux_x86_64.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 65))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/pyspnego-0.12.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 66))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/pytest-9.0.2+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 67))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/python_dateutil-2.9.0.post0+computecanada-py2.py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 68))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/pytz-2025.2+computecanada-py2.py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 69))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v3/pyzmq-27.1.0+computecanada-cp311-cp311-linux_x86_64.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 70))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic/qiskit-1.2.4+computecanada-cp38-abi3-linux_x86_64.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt (line 71))
+ERROR: Ignored the following versions that require a different python version: 9.11.0 Requires-Python >=3.12; 9.12.0 Requires-Python >=3.12
+ERROR: Could not find a version that satisfies the requirement qiskit-aer-gpu==0.15.1 (from versions: 0.14.2+computecanada, 0.17.0+computecanada, 0.17.2+computecanada)
+ERROR: No matching distribution found for qiskit-aer-gpu==0.15.1
+(qubo) [btalbot@siku104 ~]$ pip install qiskit-aer-gpu
+Looking in links: /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v4, /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v3, /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic, /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v3/qiskit_aer_gpu-0.17.2+computecanada-cp311-cp311-linux_x86_64.whl
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic/qiskit-2.3.0+computecanada-cp310-abi3-linux_x86_64.whl (from qiskit-aer-gpu)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic/numpy-2.4.2+computecanada-cp311-cp311-linux_x86_64.whl (from qiskit-aer-gpu)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic/scipy-1.17.0+computecanada-cp311-cp311-linux_x86_64.whl (from qiskit-aer-gpu)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic/psutil-7.2.2+computecanada-cp36-abi3-linux_x86_64.whl (from qiskit-aer-gpu)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/python_dateutil-2.9.0.post0+computecanada-py2.py3-none-any.whl (from qiskit-aer-gpu)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/six-1.17.0+computecanada-py2.py3-none-any.whl (from python-dateutil>=2.8.0->qiskit-aer-gpu)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic/rustworkx-0.16.0+computecanada-cp39-abi3-linux_x86_64.whl (from qiskit>=1.1.0->qiskit-aer-gpu)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/dill-0.4.1+computecanada-py3-none-any.whl (from qiskit>=1.1.0->qiskit-aer-gpu)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/stevedore-5.7.0+computecanada-py3-none-any.whl (from qiskit>=1.1.0->qiskit-aer-gpu)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/typing_extensions-4.15.0+computecanada-py3-none-any.whl (from qiskit>=1.1.0->qiskit-aer-gpu)
+Installing collected packages: typing-extensions, stevedore, six, psutil, numpy, dill, scipy, rustworkx, python-dateutil, qiskit, qiskit-aer-gpu
+Successfully installed dill-0.4.1+computecanada numpy-2.4.2+computecanada psutil-7.2.2+computecanada python-dateutil-2.9.0.post0+computecanada qiskit-2.3.0+computecanada qiskit-aer-gpu-0.17.2+computecanada rustworkx-0.16.0+computecanada scipy-1.17.0+computecanada six-1.17.0+computecanada stevedore-5.7.0+computecanada typing-extensions-4.15.0+computecanada
+(qubo) [btalbot@siku104 ~]$ pip install -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt
+Looking in links: /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v4, /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v3, /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic, /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/qiskit_algorithms-0.3.1+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 1))
+Collecting qiskit-ibm-runtime==0.44.0 (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 2))
+  Obtaining dependency information for qiskit-ibm-runtime==0.44.0 from https://files.pythonhosted.org/packages/74/99/a174010d86960df130fbd42b76c738d6aa47e187f8f97b7f6aaa4ff3b85e/qiskit_ibm_runtime-0.44.0-py3-none-any.whl.metadata
+  Downloading qiskit_ibm_runtime-0.44.0-py3-none-any.whl.metadata (21 kB)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/qiskit_nature-0.7.2+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 3))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/qiskit_optimization-0.7.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 4))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/requests-2.32.5+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 5))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/requests_ntlm-1.3.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 6))
+Collecting rustworkx==0.17.1 (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 7))
+  Downloading rustworkx-0.17.1.tar.gz (399 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 399.4/399.4 kB 2.5 MB/s eta 0:00:00
+  Installing build dependencies ... done
+  Getting requirements to build wheel ... done
+  Preparing metadata (pyproject.toml) ... done
+ERROR: Could not find a version that satisfies the requirement scipy==1.16.3 (from versions: 1.10.1+computecanada, 1.11.2+computecanada, 1.12.0+computecanada, 1.13.1+computecanada, 1.14.1+computecanada, 1.15.1+computecanada, 1.15.2+computecanada, 1.16.2+computecanada, 1.17.0+computecanada)
+ERROR: No matching distribution found for scipy==1.16.3
+(qubo) [btalbot@siku104 ~]$ pip install scipy
+Looking in links: /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v4, /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v3, /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic, /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic
+Requirement already satisfied: scipy in ./envs/qubo/lib/python3.11/site-packages (1.17.0+computecanada)
+Requirement already satisfied: numpy<2.7,>=1.26.4 in ./envs/qubo/lib/python3.11/site-packages (from scipy) (2.4.2+computecanada)
+(qubo) [btalbot@siku104 ~]$ pip install -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt
+Looking in links: /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v4, /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v3, /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic, /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/seaborn-0.13.2+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 1))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/setuptools-80.9.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 2))
+Requirement already satisfied: six==1.17.0 in ./envs/qubo/lib/python3.11/site-packages (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 3)) (1.17.0+computecanada)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/sortedcontainers-2.4.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 4))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/stack_data-0.6.3+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 5))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/stevedore-5.6.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 6))
+Collecting symengine==0.13.0 (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 7))
+  Downloading symengine-0.13.0.tar.gz (114 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 114.2/114.2 kB 1.4 MB/s eta 0:00:00
+  Installing build dependencies ... done
+  Getting requirements to build wheel ... done
+  Installing backend dependencies ... done
+  Preparing metadata (pyproject.toml) ... done
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/sympy-1.14.0+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 8))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/tornado-6.5.4+computecanada-cp39-abi3-linux_x86_64.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 9))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/tqdm-4.67.3+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 10))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/traitlets-5.14.3+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 11))
+Requirement already satisfied: typing_extensions==4.15.0 in ./envs/qubo/lib/python3.11/site-packages (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 12)) (4.15.0+computecanada)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/typing_inspection-0.4.2+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 13))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/tzdata-2025.3+computecanada-py2.py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 14))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/urllib3-2.6.3+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 15))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/wcwidth-0.2.14+computecanada-py2.py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 16))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/wheel-0.45.1+computecanada-py3-none-any.whl (from -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 17))
+Requirement already satisfied: numpy!=1.24.0,>=1.20 in ./envs/qubo/lib/python3.11/site-packages (from seaborn==0.13.2->-r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 1)) (2.4.2+computecanada)
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v3/pandas-3.0.0+computecanada-cp311-cp311-linux_x86_64.whl (from seaborn==0.13.2->-r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 1))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic/matplotlib-3.10.8+computecanada-cp311-cp311-linux_x86_64.whl (from seaborn==0.13.2->-r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 1))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/executing-2.2.1+computecanada-py2.py3-none-any.whl (from stack_data==0.6.3->-r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 5))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/asttokens-3.0.1+computecanada-py3-none-any.whl (from stack_data==0.6.3->-r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 5))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/pure_eval-0.2.3+computecanada-py3-none-any.whl (from stack_data==0.6.3->-r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 5))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/mpmath-1.3.0+computecanada-py3-none-any.whl (from sympy==1.14.0->-r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 8))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/generic/contourpy-1.3.3+computecanada-cp311-cp311-linux_x86_64.whl (from matplotlib!=3.6.1,>=3.4->seaborn==0.13.2->-r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 1))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/cycler-0.12.1+computecanada-py3-none-any.whl (from matplotlib!=3.6.1,>=3.4->seaborn==0.13.2->-r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 1))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/fonttools-4.62.1+computecanada-cp311-cp311-linux_x86_64.whl (from matplotlib!=3.6.1,>=3.4->seaborn==0.13.2->-r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 1))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/kiwisolver-1.4.9+computecanada-cp311-cp311-linux_x86_64.whl (from matplotlib!=3.6.1,>=3.4->seaborn==0.13.2->-r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 1))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/packaging-26.0+computecanada-py3-none-any.whl (from matplotlib!=3.6.1,>=3.4->seaborn==0.13.2->-r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 1))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/gentoo2023/x86-64-v3/pillow-12.1.0+computecanada-cp311-cp311-linux_x86_64.whl (from matplotlib!=3.6.1,>=3.4->seaborn==0.13.2->-r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 1))
+Processing /cvmfs/soft.computecanada.ca/custom/python/wheelhouse/generic/pyparsing-3.3.2+computecanada-py3-none-any.whl (from matplotlib!=3.6.1,>=3.4->seaborn==0.13.2->-r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 1))
+Requirement already satisfied: python-dateutil>=2.7 in ./envs/qubo/lib/python3.11/site-packages (from matplotlib!=3.6.1,>=3.4->seaborn==0.13.2->-r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements2.txt (line 1)) (2.9.0.post0+computecanada)
+Building wheels for collected packages: symengine
+  Building wheel for symengine (pyproject.toml) ... error
+  error: subprocess-exited-with-error
+  
+  × Building wheel for symengine (pyproject.toml) did not run successfully.
+  │ exit code: 1
+  ╰─> [53 lines of output]
+      /tmp/pip-build-env-1dj5y8io/overlay/lib/python3.11/site-packages/wheel/bdist_wheel.py:4: FutureWarning: The 'wheel' package is no longer the canonical location of the 'bdist_wheel' command, and will be removed in a future release. Please update to setuptools v70.1 or later which contains an integrated version of this command.
+        warn(
+      /tmp/pip-build-env-1dj5y8io/overlay/lib/python3.11/site-packages/setuptools/dist.py:765: SetuptoolsDeprecationWarning: License classifiers are deprecated.
+      !!
+      
+              ********************************************************************************
+              Please consider removing the following classifiers in favor of a SPDX license expression:
+      
+              License :: OSI Approved :: MIT License
+      
+              See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+              ********************************************************************************
+      
+      !!
+        self._finalize_license_expression()
+      running bdist_wheel
+      running build
+      running build_ext
+      CMake Deprecation Warning at CMakeLists.txt:1 (cmake_minimum_required):
+        Compatibility with CMake < 3.5 will be removed from a future version of
+        CMake.
+      
+        Update the VERSION argument <min> value or use a ...<max> suffix to tell
+        CMake that the project does not need compatibility with older versions.
+      
+      
+      -- The C compiler identification is GNU 12.3.1
+      -- The CXX compiler identification is GNU 12.3.1
+      -- Detecting C compiler ABI info
+      -- Detecting C compiler ABI info - done
+      -- Check for working C compiler: /cvmfs/soft.computecanada.ca/custom/bin/cc - skipped
+      -- Detecting C compile features
+      -- Detecting C compile features - done
+      -- Detecting CXX compiler ABI info
+      -- Detecting CXX compiler ABI info - done
+      -- Check for working CXX compiler: /cvmfs/soft.computecanada.ca/gentoo/2023/x86-64-v3/usr/x86_64-pc-linux-gnu/gcc-bin/12/c++ - skipped
+      -- Detecting CXX compile features
+      -- Detecting CXX compile features - done
+      CMake Error at CMakeLists.txt:16 (find_package):
+        Could not find a package configuration file provided by "SymEngine"
+        (requested version 0.8.1) with any of the following names:
+      
+          SymEngineConfig.cmake
+          symengine-config.cmake
+      
+        Add the installation prefix of "SymEngine" to CMAKE_PREFIX_PATH or set
+        "SymEngine_DIR" to a directory containing one of the above files.  If
+        "SymEngine" provides a separate development package or SDK, be sure it has
+        been installed.
+      
+      
+      -- Configuring incomplete, errors occurred!
+      error: error calling cmake
+      [end of output]
+  
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+  ERROR: Failed building wheel for symengine
+Failed to build symengine
+ERROR: Could not build wheels for symengine, which is required to install pyproject.toml-based projects
+(qubo) [btalbot@siku104 ~]$ 
