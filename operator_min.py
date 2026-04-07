@@ -1,7 +1,7 @@
 api_key = ''
 # hamiltonians_path = '/home/btalbot/projects/def-stijn/btalbot/op_min/hamiltonians/' # Siku
 hamiltonians_path = '/home/btalbot/links/projects/def-stijn/btalbot/op_min/hamiltonians/' # Trillium
-# hamiltonians_path = './hamiltonians/'
+# hamiltonians_path = './hamiltonians/' # local
 
 simulation = True
 
@@ -11,12 +11,14 @@ simulation = True
 
 # Imports
 
-from itertools import combinations
+from itertools import combinations, product
 from collections import defaultdict
 from dataclasses import dataclass
+import math
 from random import randint
 
 from qiskit import transpile, QuantumCircuit
+from qiskit.circuit import Parameter
 from qiskit.circuit.library import XXPlusYYGate
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
@@ -34,6 +36,122 @@ from qiskit_aer.primitives import Sampler as AerSampler
 
 
 # Graph colouring Qubo Quadratic Program
+
+def adjacency_matrix_to_list(A):
+    graph = {}
+    n = len(A)
+    for i in range(n):
+        graph[i] = [j for j in range(n) if A[i][j] == 1]
+    return graph
+
+def space_efficient_qp(A, num_colors, C=10.0, D=1.0):
+    qp = QuadraticProgram()
+    graph = adjacency_matrix_to_list(A)
+
+    nodes = list(graph.keys())
+    m = math.ceil(math.log2(num_colors))
+
+    # --- Variables: b_{v,l}
+    b = {}
+    for v in nodes:
+        for l in range(m):
+            name = f"b_{v}_{l}"
+            qp.binary_var(name)
+            b[(v, l)] = name
+
+    linear = {}
+    quadratic = {}
+    constant = 0
+
+
+    def add_linear(var, coeff):
+        linear[var] = linear.get(var, 0) + coeff
+
+    def add_quadratic(v1, v2, coeff):
+        key = tuple(sorted([v1, v2]))
+        quadratic[key] = quadratic.get(key, 0) + coeff
+
+    for u in nodes:
+        for v in graph[u]:
+            if u >= v:
+                continue
+
+            # Start with constant term
+            terms = [({}, 1.0)]  # (monomial dict, coeff)
+
+            for l in range(m):
+                bu = b[(u, l)]
+                bv = b[(v, l)]
+
+                new_terms = []
+
+                for mon, coeff in terms:
+                    # multiply by (1 - bu - bv + 2 bu bv)
+
+                    # 1
+                    new_terms.append((mon.copy(), coeff))
+
+                    # -bu
+                    mon1 = mon.copy()
+                    mon1[bu] = mon1.get(bu, 0) + 1
+                    new_terms.append((mon1, -coeff))
+
+                    # -bv
+                    mon2 = mon.copy()
+                    mon2[bv] = mon2.get(bv, 0) + 1
+                    new_terms.append((mon2, -coeff))
+
+                    # +2 bu bv
+                    mon3 = mon.copy()
+                    mon3[bu] = mon3.get(bu, 0) + 1
+                    mon3[bv] = mon3.get(bv, 0) + 1
+                    new_terms.append((mon3, 2 * coeff))
+
+                terms = new_terms
+
+            for mon, coeff in terms:
+                coeff *= C
+
+                vars_list = []
+                for var, power in mon.items():
+                    vars_list.extend([var] * power)
+
+                if len(vars_list) == 0:
+                    constant += coeff
+
+                elif len(vars_list) == 1:
+                    add_linear(vars_list[0], coeff)
+
+                elif len(vars_list) == 2:
+                    add_quadratic(vars_list[0], vars_list[1], coeff)
+
+                else:
+                    # introduce auxiliary variable
+                    aux = "_aux_" + "_".join(vars_list)
+                    qp.binary_var(aux)
+
+                    k = len(vars_list)
+
+                    # aux <= each var
+                    for var in vars_list:
+                        qp.linear_constraint({aux: 1, var: -1}, "<=", 0)
+
+                    # aux >= sum(vars) - (k-1)
+                    qp.linear_constraint(
+                        {aux: 1, **{v: -1 for v in vars_list}},
+                        ">=",
+                        -(k - 1)
+                    )
+
+                    add_linear(aux, coeff)
+
+    if num_colors < 2**m:
+        for v in nodes:
+            coeffs = {b[(v, l)]: 2**l for l in range(m)}
+            qp.linear_constraint(coeffs, "<=", num_colors - 1)
+
+    qp.minimize(linear=linear, quadratic=quadratic, constant=constant)
+    return qp
 
 def graph_colouring_qubo_qp(A: list[list[int]], k: int, C: int, D: int, name:str="graph_colouring_qubo"):
     """
@@ -242,27 +360,74 @@ class PauliGroupingInfo:
     C: int
     D: int
 
-def xy_mixer(n, k, beta):
-    n_qubits = n * k
-    qc = QuantumCircuit(n_qubits)
-    
+def int_to_bits(x, m):
+    return [(x >> i) & 1 for i in range(m)]
+
+from qiskit import QuantumCircuit
+from itertools import product
+
+def vertex_binary_mixer(qc, qubits, k, beta):
+    """
+    qc: QuantumCircuit
+    qubits: list of qubits for this vertex
+    k: number of colors
+    beta: QAOA parameter
+    """
+    m = len(qubits)
+
+    for c in range(k - 1):
+        bits_c = int_to_bits(c, m)
+        bits_cp1 = int_to_bits(c + 1, m)
+
+        # Find which bits differ
+        diff = [i for i in range(m) if bits_c[i] != bits_cp1[i]]
+
+        # Apply controlled rotation between the two states
+        # We implement a multi-controlled RX
+
+        controls = []
+        target = None
+
+        for i in range(m):
+            if i in diff:
+                target = qubits[i]
+            else:
+                if bits_c[i] == 1:
+                    controls.append(qubits[i])
+                else:
+                    qc.x(qubits[i])
+                    controls.append(qubits[i])
+
+        if target is not None and controls != []:
+            qc.mcrx(2 * beta, controls, target)
+
+        # Undo X gates
+        for i in range(m):
+            if i not in diff and bits_c[i] == 0:
+                qc.x(qubits[i])
+
+def binary_coloring_mixer(n, k, beta):
+    m = math.ceil(math.log2(k))
+    qc = QuantumCircuit(n * m)
+
     for v in range(n):
-        # apply XY interactions between all colour pairs
-        for c1, c2 in combinations(range(k), 2):
-            q1 = v * k + c1
-            q2 = v * k + c2
-            
-            qc.append(XXPlusYYGate(2 * beta), [q1, q2])
-    
+        qubits = [v * m + i for i in range(m)]
+        vertex_binary_mixer(qc, qubits, k, beta)
+
     return qc
 
-def initial_state(n: int, k: int):
-    qc = QuantumCircuit(n * k)
-    
+def binary_initial_state(n, k):
+    m = math.ceil(math.log2(k))
+    qc = QuantumCircuit(n * m)
+
     for v in range(n):
-        c = v % k  # simple valid assignment
-        qc.x(v * k + c)
-    
+        c = v % k
+        bits = int_to_bits(c, m)
+
+        for i, bit in enumerate(bits):
+            if bit == 1:
+                qc.x(v * m + i)
+
     return qc
 
 def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level: int, service: QiskitRuntimeService | None, simulation: bool = True):
@@ -304,22 +469,41 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
             max_memory_mb=700000,
         )
         
-        qp_to_qubo = QuadraticProgramToQubo()
-        qubo = qp_to_qubo.convert(qp)
+        qubo = qubo = QuadraticProgramToQubo().convert(qp)
+
+        spsa = SPSA(
+            maxiter=300,
+            learning_rate=0.05,
+            perturbation=0.1,
+            blocking=True,
+            allowed_increase=0.01
+        )
 
         qaoa = QAOA(
             sampler=AerSampler(
                 run_options={'shots': 256},
                 backend_options=backend_options
             ),
-            optimizer=SPSA(),
+            optimizer=COBYLA(),
             reps=reps,
-            initial_state=initial_state(n, k),
-            mixer=xy_mixer(n, k, beta=0.5)
+            # initial_state=binary_initial_state(n, k),
+            # mixer=binary_coloring_mixer(n, k, beta=Parameter('beta')),
+            initial_point=[0.1] * (2 * reps)
         )
 
         optimizer = MinimumEigenOptimizer(qaoa)
         result = optimizer.solve(qubo)
+
+        subs = {
+            'b_0_0': 0,
+            'b_1_0': 0,
+            'b_2_0': 0,
+            'b_3_0': 0,
+            'b_4_0': 1,
+            'b_5_0': 1,
+            'b_6_0': 1
+        }
+        substitute_solution(qp, subs)
     return result
 
 def get_results(pauli_grouping_info: PauliGroupingInfo, job_result: dict | None = None, service: QiskitRuntimeService | None = None, job_id: str | None = None):
@@ -372,7 +556,10 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
         D=D
     )
     
-    qp = graph_colouring_qubo_qp(A_comp, k, C, D)
+    # qp = graph_colouring_qubo_qp(A_comp, k, C, D)
+
+    qp = space_efficient_qp(A_comp, num_colors=k)
+    # print(qp.prettyprint())
 
     service = None
     if simulation == False:
@@ -390,6 +577,19 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
     #     groups[colour].append(i)
 
     # return list(groups.values())
+
+def substitute_solution(qp, subs):
+    # subs = {
+    #     'x_0_0': 1,
+    #     'x_0_1': 0,
+    #     'x_1_0': 1,
+    #     'x_1_1': 0,
+    #     'x_2_0': 1,
+    #     'x_2_1': 0,
+    #     # etc.
+    # }
+
+    print('Optimal solution:', qp.substitute_variables(subs))
 
 
 # Variable Definitions

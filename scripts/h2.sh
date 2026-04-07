@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=192
 #SBATCH --mem=0
-#SBATCH --time=00:20:00
+#SBATCH --time=24:00:00
 #SBATCH --partition=compute
 #SBATCH --output=/scratch/btalbot/jobs/job_%j.out
 #SBATCH --error=/scratch/btalbot/jobs/job_%j.err
