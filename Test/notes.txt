@@ -1,3 +1,8 @@
+ChatGPT Chats:
+- 
+
+
+
 ssh -i ~/.ssh/id_rsa_ccdb btalbot@trillium-gpu.alliancecan.ca
 
 transfer files

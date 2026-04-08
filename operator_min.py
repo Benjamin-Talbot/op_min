@@ -1,7 +1,7 @@
 api_key = ''
 # hamiltonians_path = '/home/btalbot/projects/def-stijn/btalbot/op_min/hamiltonians/' # Siku
-hamiltonians_path = '/home/btalbot/links/projects/def-stijn/btalbot/op_min/hamiltonians/' # Trillium
-# hamiltonians_path = './hamiltonians/' # local
+# hamiltonians_path = '/home/btalbot/links/projects/def-stijn/btalbot/op_min/hamiltonians/' # Trillium
+hamiltonians_path = './hamiltonians/' # local
 
 simulation = True
 
@@ -16,6 +16,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 import math
 from random import randint
+import numpy as np
 
 from qiskit import transpile, QuantumCircuit
 from qiskit.circuit import Parameter
@@ -277,6 +278,90 @@ def complement_graph(A):
     
     return A_comp
 
+def build_commutation_graph(paulis):
+    n = len(paulis)
+    A = np.zeros((n, n), dtype=int)
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            if qwc(paulis.paulis[i], paulis.paulis[j]):
+                A[i, j] = 1
+                A[j, i] = 1
+
+    return A
+
+import itertools
+import math
+
+def projector_term(n_qubits, qubit_indices, bitstring):
+    """
+    Build projector onto a specific bitstring using Z operators.
+    """
+    terms = []
+
+    for signs in itertools.product([0, 1], repeat=len(bitstring)):
+        coeff = 1.0
+        pauli = ["I"] * n_qubits
+
+        for i, (bit, s) in enumerate(zip(bitstring, signs)):
+            q = qubit_indices[i]
+
+            if s == 0:
+                coeff *= 0.5
+            else:
+                coeff *= 0.5 * (1 if bit == 0 else -1)
+                pauli[q] = "Z"
+
+        terms.append(("".join(pauli), coeff))
+
+    return SparsePauliOp.from_list(terms)
+
+def binary_coloring_hamiltonian(graph, k, A=10.0, B=1.0):
+    n = len(graph)
+    m = math.ceil(math.log2(k))
+    n_qubits = n * m
+
+    H = SparsePauliOp.from_list([("I" * n_qubits, 0.0)])
+
+    # --- INVALID COLOR PENALTY ---
+    for v in range(n):
+        qubits = [v * m + i for i in range(m)]
+
+        for c in range(k, 2**m):
+            bits = [(c >> i) & 1 for i in range(m)]
+            P = projector_term(n_qubits, qubits, bits)
+            H += A * P
+
+    # --- EDGE PENALTY ---
+    for u in graph:
+        for v in graph[u]:
+            if u < v:
+                qubits_u = [u * m + i for i in range(m)]
+                qubits_v = [v * m + i for i in range(m)]
+
+                for c in range(k):
+                    bits = [(c >> i) & 1 for i in range(m)]
+
+                    P_u = projector_term(n_qubits, qubits_u, bits)
+                    P_v = projector_term(n_qubits, qubits_v, bits)
+
+                    H += B * (P_u @ P_v)
+
+    return H.simplify()
+
+def build_cost_hamiltonian(paulis, k):
+    A = build_commutation_graph(paulis)
+
+    # complement graph (non-commuting edges)
+    A_comp = 1 - A
+    np.fill_diagonal(A_comp, 0)
+
+    A_comp = adjacency_matrix_to_list(A_comp)
+    H = binary_coloring_hamiltonian(A_comp, k)
+
+    return H
+
+
 
 # Cost Function
 
@@ -430,6 +515,48 @@ def binary_initial_state(n, k):
 
     return qc
 
+def int_to_bits(x, m):
+    return [(x >> i) & 1 for i in range(m)]
+
+def gray_code_mixer(n, k, beta):
+    m = math.ceil(math.log2(k))
+    qc = QuantumCircuit(n * m)
+
+    for v in range(n):
+        qubits = [v * m + i for i in range(m)]
+
+        for c in range(k - 1):
+            bits_c = int_to_bits(c, m)
+            bits_cp1 = int_to_bits(c + 1, m)
+
+            # find differing bit
+            diff = [i for i in range(m) if bits_c[i] != bits_cp1[i]]
+            if len(diff) != 1:
+                continue  # skip non-Gray transitions
+
+            target = qubits[diff[0]]
+
+            controls = []
+            for i in range(m):
+                if i == diff[0]:
+                    continue
+
+                if bits_c[i] == 1:
+                    controls.append(qubits[i])
+                else:
+                    qc.x(qubits[i])
+                    controls.append(qubits[i])
+
+            if controls:
+                qc.mcrx(2 * beta, controls, target)
+
+            # undo X gates
+            for i in range(m):
+                if i != diff[0] and bits_c[i] == 0:
+                    qc.x(qubits[i])
+
+    return qc
+
 def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level: int, service: QiskitRuntimeService | None, simulation: bool = True):
     result = None
     if simulation == False:
@@ -486,24 +613,49 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
             ),
             optimizer=COBYLA(),
             reps=reps,
-            # initial_state=binary_initial_state(n, k),
-            # mixer=binary_coloring_mixer(n, k, beta=Parameter('beta')),
+            initial_state=binary_initial_state(n, k),
+            mixer=gray_code_mixer(n, k, beta=Parameter("β")),
             initial_point=[0.1] * (2 * reps)
+            # mixer=binary_coloring_mixer(n, k, beta=Parameter('beta')),
+            # initial_point=[0.1] * (1 * reps)
         )
 
         optimizer = MinimumEigenOptimizer(qaoa)
         result = optimizer.solve(qubo)
+    return result
 
-        subs = {
-            'b_0_0': 0,
-            'b_1_0': 0,
-            'b_2_0': 0,
-            'b_3_0': 0,
-            'b_4_0': 1,
-            'b_5_0': 1,
-            'b_6_0': 1
-        }
-        substitute_solution(qp, subs)
+def run_qaoa_H(H, reps=2):
+    backend_options = dict(
+        method="matrix_product_state",
+        max_parallel_threads=6,
+        matrix_product_state_max_bond_dimension=32,
+        matrix_product_state_truncation_threshold=1e-8,
+        max_memory_mb=700000,
+    )
+
+    spsa = SPSA(
+        maxiter=300,
+        learning_rate=0.05,
+        perturbation=0.1,
+        blocking=True,
+        allowed_increase=0.01
+    )
+
+    qaoa = QAOA(
+        sampler=AerSampler(
+            run_options={'shots': 256},
+            backend_options=backend_options
+        ),
+        optimizer=COBYLA(),
+        reps=reps,
+        # initial_state=binary_initial_state(n, k),
+        # mixer=binary_coloring_mixer(n, k, beta=Parameter('beta')),
+        # initial_point=[0.1] * (2 * reps)
+    )
+
+    print('Number of qubits:', H.num_qubits)
+
+    result = qaoa.compute_minimum_eigenvalue(H)
     return result
 
 def get_results(pauli_grouping_info: PauliGroupingInfo, job_result: dict | None = None, service: QiskitRuntimeService | None = None, job_id: str | None = None):
@@ -530,12 +682,27 @@ def get_results(pauli_grouping_info: PauliGroupingInfo, job_result: dict | None 
 
     return (opt_sol_found, costs[opt_sol_found])
 
+def decode_bitstring(bitstring, n, k):
+    m = int(np.ceil(np.log2(k)))
+    colors = []
+    bitstring = bitstring[::-1] # reverse to match indexing
+
+    for v in range(n):
+        value = 0
+        for l in range(m):
+            bit = int(bitstring[v * m + l])
+            value += bit << l
+
+        colors.append(value)
+
+    return colors[::-1] # reverse back
+
 
 #########################
 # Running QAOA on a QPU #
 #########################
 
-def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, optimization_level: int, api_key: str, simulation: bool = True):
+def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, optimization_level: int, api_key: str, simulation: bool = True, ham_repr: bool = False):
     '''
     Group the Pauli words in a SparsePauliOp object into QWC groups.
     Returns a list of lists, where each inner list contains the indices of the Pauli words that belong to the same QWC group.
@@ -567,7 +734,13 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
             channel="ibm_quantum_platform",
             token=api_key
         )
-    result = run_qaoa(qp, reps, pauli_grouping_info.n, k, optimization_level, service)
+    
+    if ham_repr:
+        H = build_cost_hamiltonian(paulis, k)
+        result = run_qaoa_H(H, reps)
+        print(decode_bitstring(result.best_measurement['bitstring'], pauli_grouping_info.n, k))
+    else:
+        result = run_qaoa(qp, reps, pauli_grouping_info.n, k, optimization_level, service)
 
     return (pauli_grouping_info, result)
     
@@ -594,7 +767,7 @@ def substitute_solution(qp, subs):
 
 # Variable Definitions
 
-C = 100
-D = 10
+C = 10
+D = 1
 reps = 3
 optimization_level = 2

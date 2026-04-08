@@ -13,14 +13,18 @@ paulis_list = [
 paulis = SparsePauliOp.from_list([(p, 1.0) for p in paulis_list])
 
 k = 2
-pauli_grouping_info, result = pauli_grouping(paulis, C, D, k, reps, optimization_level, api_key)
+ham_repr = True
+pauli_grouping_info, result = pauli_grouping(paulis, C, D, k, reps, optimization_level, api_key, ham_repr=ham_repr)
 
-print(result)
-print("Number of samples:", len(result.samples))
-print()
+if ham_repr:
+    print('Result:', result.best_measurement['bitstring'])
+    print('Cost value:', result.cost_function_evals)
+else:
+    print("Number of samples:", len(result.samples))
+    print()
 
-print("\nBest solution:")
-print(result.prettyprint())
+    print("\nBest solution:")
+    print(result.prettyprint())
 
-print()
-print(result.x)
+    print()
+    print(result.x)
