@@ -14,10 +14,14 @@ python -m venv ~/envs/qubo
 source ~/envs/qubo/bin/activate
 python -m venv $SCRATCH/~envs/qenv
 source $SCRATCH/~envs/qenv/bin/activate
+python -m venv /home/btalbot/scratch/envs/qubo
+source /home/btalbot/scratch/envs/qubo/bin/activate
+
+pip install --no-index --find-links=/home/btalbot/scratch/op_min/wheels -r requirements_trillium.txt
 
 pip install --upgrade pip setuptools wheel
 
-salloc --time=0:10:0 --mem=8G
+salloc --time=0:20:0 --mem=8G
 
 pip install -r /home/btalbot/projects/def-stijn/btalbot/op_min/requirements.txt
 pip install -r /home/btalbot/links/projects/def-stijn/btalbot/op_min/requirements.txt
@@ -28,3 +32,5 @@ python /home/btalbot/projects/def-stijn/btalbot/op_min/h2.py
 sbatch script.sh
 
 squeue -u $USER
+
+cat /home/btalbot/scratch/jobs/job_ID.out

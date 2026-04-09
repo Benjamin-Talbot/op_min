@@ -18,7 +18,7 @@ module load StdEnv/2023
 module load python/3.11
 
 # Activate venv
-source /scratch/btalbot/~envs/qenv/bin/activate
+source /home/btalbot/scratch/envs/qenv/bin/activate
 
 # Threading
 export OMP_NUM_THREADS=6
@@ -28,4 +28,4 @@ export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 
 # Run
-python ~/links/projects/def-stijn/btalbot/op_min/h2.py
+python /home/btalbot/scratch/op_min/h2.py

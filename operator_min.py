@@ -1,7 +1,8 @@
 api_key = ''
 # hamiltonians_path = '/home/btalbot/projects/def-stijn/btalbot/op_min/hamiltonians/' # Siku
 # hamiltonians_path = '/home/btalbot/links/projects/def-stijn/btalbot/op_min/hamiltonians/' # Trillium
-hamiltonians_path = './hamiltonians/' # local
+hamiltonians_path = '/home/btalbot/scratch/op_min/hamiltonians/' # Nibi
+# hamiltonians_path = './hamiltonians/' # local
 
 simulation = True
 
@@ -15,6 +16,7 @@ from itertools import combinations, product
 from collections import defaultdict
 from dataclasses import dataclass
 import math
+import os
 from random import randint
 import numpy as np
 
@@ -730,7 +732,7 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
 
         backend_options = dict(
             method="matrix_product_state",
-            max_parallel_threads=6,
+            max_parallel_threads=int(os.environ.get("SLURM_CPUS_PER_TASK", "1")),
             matrix_product_state_max_bond_dimension=32,
             matrix_product_state_truncation_threshold=1e-8,
             max_memory_mb=700000,
@@ -805,7 +807,7 @@ def run_qaoa_H(H, n, k, reps=2, service: QiskitRuntimeService | None = None, opt
 
     backend_options = dict(
         method="matrix_product_state",
-        max_parallel_threads=6,
+        max_parallel_threads=int(os.environ.get("SLURM_CPUS_PER_TASK", "1")),
         matrix_product_state_max_bond_dimension=32,
         matrix_product_state_truncation_threshold=1e-8,
         max_memory_mb=700000,
