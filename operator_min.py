@@ -15,6 +15,7 @@ from itertools import combinations
 from collections import defaultdict
 from dataclasses import dataclass
 from random import randint
+from types import SimpleNamespace
 
 from qiskit import transpile, QuantumCircuit
 from qiskit.circuit.library import XXPlusYYGate
@@ -159,6 +160,20 @@ def complement_graph(A):
     
     return A_comp
 
+def subgraph_from_indices(A, indices):
+    return [[A[i][j] for j in indices] for i in indices]
+
+def split_fully_commuting_terms(paulis: SparsePauliOp):
+    A = generate_qwc_graph(paulis)
+    fully_commuting_vertices = [
+        index for index, row in enumerate(A) if sum(row) == len(A) - 1
+    ]
+    fully_commuting_set = set(fully_commuting_vertices)
+    active_vertices = [
+        index for index in range(len(A)) if index not in fully_commuting_set
+    ]
+    return A, active_vertices, fully_commuting_vertices
+
 
 # Cost Function
 
@@ -241,6 +256,173 @@ class PauliGroupingInfo:
     vertices: list[int]
     C: int
     D: int
+    active_vertices: list[int] | None = None
+    active_A_comp: list[list[int]] | None = None
+    fully_commuting_vertices: list[int] | None = None
+    raw_colours: list[int] | None = None
+    repaired_colours: list[int] | None = None
+    groups: list[list[int]] | None = None
+    groups_by_colour: list[list[int]] | None = None
+    raw_conflicts: int | None = None
+    repaired_conflicts: int | None = None
+    invalid_vertices: list[int] | None = None
+
+def count_colour_conflicts(A, colours, num_colors):
+    conflicts = 0
+    for v, w in combinations(range(len(colours)), 2):
+        if A[v][w] == 1 and 0 <= colours[v] < num_colors and colours[v] == colours[w]:
+            conflicts += 1
+    return conflicts
+
+def local_conflicts(A, colours, vertex, colour, num_colors):
+    conflicts = 0
+    for neighbour, edge in enumerate(A[vertex]):
+        if vertex == neighbour or edge != 1:
+            continue
+        neighbour_colour = colours[neighbour]
+        if 0 <= neighbour_colour < num_colors and neighbour_colour == colour:
+            conflicts += 1
+    return conflicts
+
+def repair_colouring(A, colours, num_colors):
+    repaired = list(colours)
+    degrees = [sum(row) for row in A]
+    order = sorted(range(len(repaired)), key=lambda vertex: degrees[vertex], reverse=True)
+
+    for vertex in order:
+        if 0 <= repaired[vertex] < num_colors:
+            continue
+        repaired[vertex] = min(
+            range(num_colors),
+            key=lambda colour: local_conflicts(A, repaired, vertex, colour, num_colors),
+        )
+
+    for _ in range(max(1, len(repaired))):
+        improved = False
+        for vertex in order:
+            current = repaired[vertex]
+            best_colour = current
+            best_conflicts = local_conflicts(A, repaired, vertex, current, num_colors)
+
+            for colour in range(num_colors):
+                if colour == current:
+                    continue
+                candidate_conflicts = local_conflicts(A, repaired, vertex, colour, num_colors)
+                if candidate_conflicts < best_conflicts:
+                    best_colour = colour
+                    best_conflicts = candidate_conflicts
+
+            if best_colour != current:
+                repaired[vertex] = best_colour
+                improved = True
+
+        if not improved:
+            break
+
+    return repaired
+
+def colouring_to_groups(colours, num_colors):
+    return [group for group in colouring_to_groups_by_colour(colours, num_colors) if group]
+
+def colouring_to_groups_by_colour(colours, num_colors):
+    groups = defaultdict(list)
+    for vertex, colour in enumerate(colours):
+        if 0 <= colour < num_colors:
+            groups[colour].append(vertex)
+    return [groups[colour] for colour in range(num_colors)]
+
+def extract_variable_values(x, variable_names):
+    return {
+        name: int(round(value))
+        for name, value in zip(variable_names, x)
+    }
+
+def decode_one_hot_colouring(variable_values, n, num_colors):
+    colours = []
+    invalid_vertices = []
+
+    for vertex in range(n):
+        active_colours = [
+            colour
+            for colour in range(num_colors)
+            if variable_values.get(f"x_{vertex}_{colour}", 0) == 1
+        ]
+
+        if len(active_colours) == 1:
+            colours.append(active_colours[0])
+        else:
+            colours.append(-1)
+            invalid_vertices.append(vertex)
+
+    return colours, invalid_vertices
+
+def postprocess_one_hot_result(
+    result,
+    qubo: QuadraticProgram,
+    full_A_comp,
+    active_A_comp,
+    active_vertices,
+    fully_commuting_vertices,
+    num_colors,
+):
+    variable_names = [variable.name for variable in qubo.variables]
+    candidate_vectors = []
+
+    if getattr(result, "samples", None):
+        candidate_vectors.extend(sample.x for sample in result.samples)
+    if getattr(result, "x", None) is not None:
+        candidate_vectors.append(result.x)
+
+    best_summary = None
+    for vector in candidate_vectors:
+        variable_values = extract_variable_values(vector, variable_names)
+        raw_active_colours, invalid_active_vertices = decode_one_hot_colouring(
+            variable_values,
+            len(active_vertices),
+            num_colors,
+        )
+        repaired_active_colours = repair_colouring(active_A_comp, raw_active_colours, num_colors)
+
+        raw_colours = [-1] * len(full_A_comp)
+        repaired_colours = [-1] * len(full_A_comp)
+
+        for local_vertex, original_vertex in enumerate(active_vertices):
+            raw_colours[original_vertex] = raw_active_colours[local_vertex]
+            repaired_colours[original_vertex] = repaired_active_colours[local_vertex]
+
+        for original_vertex in fully_commuting_vertices:
+            raw_colours[original_vertex] = 0
+            repaired_colours[original_vertex] = 0
+
+        fully_commuting_set = set(fully_commuting_vertices)
+        groups_by_colour = colouring_to_groups_by_colour(
+            [
+                colour if vertex not in fully_commuting_set else -1
+                for vertex, colour in enumerate(repaired_colours)
+            ],
+            num_colors,
+        )
+        if fully_commuting_vertices:
+            groups_by_colour[0].extend(fully_commuting_vertices)
+
+        summary = {
+            "raw_colours": raw_colours,
+            "repaired_colours": repaired_colours,
+            "groups_by_colour": groups_by_colour,
+            "groups": [group for group in groups_by_colour if group],
+            "raw_conflicts": count_colour_conflicts(full_A_comp, raw_colours, num_colors),
+            "repaired_conflicts": count_colour_conflicts(full_A_comp, repaired_colours, num_colors),
+            "invalid_vertices": [active_vertices[index] for index in invalid_active_vertices],
+        }
+        rank = (
+            summary["repaired_conflicts"],
+            len(summary["invalid_vertices"]),
+            summary["raw_conflicts"],
+        )
+        if best_summary is None or rank < best_summary[0]:
+            best_summary = (rank, summary)
+
+    return best_summary[1] if best_summary is not None else None
 
 def xy_mixer(n, k, beta):
     n_qubits = n * k
@@ -266,6 +448,8 @@ def initial_state(n: int, k: int):
     return qc
 
 def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level: int, service: QiskitRuntimeService | None, simulation: bool = True):
+    algorithm_globals.random_seed = 42
+    qubo = QuadraticProgramToQubo().convert(qp)
     result = None
     if simulation == False:
         backend = service.least_busy(simulator=False)
@@ -293,7 +477,7 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
         solver = MinimumEigenOptimizer(qaoa)
 
         # Solve
-        result = solver.solve(qp)
+        result = solver.solve(qubo)
     
     else:
         backend_options = dict(
@@ -304,9 +488,6 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
             max_memory_mb=700000,
         )
         
-        qp_to_qubo = QuadraticProgramToQubo()
-        qubo = qp_to_qubo.convert(qp)
-
         qaoa = QAOA(
             sampler=AerSampler(
                 run_options={'shots': 256},
@@ -320,7 +501,7 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
 
         optimizer = MinimumEigenOptimizer(qaoa)
         result = optimizer.solve(qubo)
-    return result
+    return result, qubo
 
 def get_results(pauli_grouping_info: PauliGroupingInfo, job_result: dict | None = None, service: QiskitRuntimeService | None = None, job_id: str | None = None):
     if service is not None and job_id is not None:
@@ -357,8 +538,9 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
     Returns a list of lists, where each inner list contains the indices of the Pauli words that belong to the same QWC group.
     '''
 
-    A = generate_qwc_graph(paulis)
+    A, active_vertices, fully_commuting_vertices = split_fully_commuting_terms(paulis)
     A_comp = complement_graph(A)
+    active_A_comp = complement_graph(subgraph_from_indices(A, active_vertices))
 
     pauli_grouping_info = PauliGroupingInfo(
         paulis=paulis,
@@ -369,10 +551,11 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
         colours=[i for i in range(k)],
         vertices=[v for v in range(len(A))],
         C=C,
-        D=D
+        D=D,
+        active_vertices=active_vertices,
+        active_A_comp=active_A_comp,
+        fully_commuting_vertices=fully_commuting_vertices,
     )
-    
-    qp = graph_colouring_qubo_qp(A_comp, k, C, D)
 
     service = None
     if simulation == False:
@@ -380,7 +563,47 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
             channel="ibm_quantum_platform",
             token=api_key
         )
-    result = run_qaoa(qp, reps, pauli_grouping_info.n, k, optimization_level, service)
+
+    if not active_vertices:
+        groups_by_colour = [[] for _ in range(k)]
+        if k > 0:
+            groups_by_colour[0] = list(fully_commuting_vertices)
+        pauli_grouping_info.raw_colours = [0] * len(A)
+        pauli_grouping_info.repaired_colours = [0] * len(A)
+        pauli_grouping_info.groups_by_colour = groups_by_colour
+        pauli_grouping_info.groups = [group for group in groups_by_colour if group]
+        pauli_grouping_info.raw_conflicts = 0
+        pauli_grouping_info.repaired_conflicts = 0
+        pauli_grouping_info.invalid_vertices = []
+        return (
+            pauli_grouping_info,
+            SimpleNamespace(
+                samples=[],
+                x=[],
+                prettyprint=lambda: "All Pauli terms commute with one another; no optimization was required.",
+            ),
+        )
+
+    qp = graph_colouring_qubo_qp(active_A_comp, k, C, D)
+    result, qubo = run_qaoa(qp, reps, len(active_vertices), k, optimization_level, service)
+
+    postprocessed = postprocess_one_hot_result(
+        result,
+        qubo,
+        A_comp,
+        active_A_comp,
+        active_vertices,
+        fully_commuting_vertices,
+        k,
+    )
+    if postprocessed is not None:
+        pauli_grouping_info.raw_colours = postprocessed["raw_colours"]
+        pauli_grouping_info.repaired_colours = postprocessed["repaired_colours"]
+        pauli_grouping_info.groups_by_colour = postprocessed["groups_by_colour"]
+        pauli_grouping_info.groups = postprocessed["groups"]
+        pauli_grouping_info.raw_conflicts = postprocessed["raw_conflicts"]
+        pauli_grouping_info.repaired_conflicts = postprocessed["repaired_conflicts"]
+        pauli_grouping_info.invalid_vertices = postprocessed["invalid_vertices"]
 
     return (pauli_grouping_info, result)
     
