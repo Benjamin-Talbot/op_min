@@ -1,7 +1,6 @@
+from pathlib import Path
+
 api_key = ''
-# hamiltonians_path = '/home/btalbot/projects/def-stijn/btalbot/op_min/hamiltonians/' # Siku
-hamiltonians_path = '/home/btalbot/links/projects/def-stijn/btalbot/op_min/hamiltonians/' # Trillium
-# hamiltonians_path = './hamiltonians/' # local
 
 simulation = True
 
@@ -37,6 +36,35 @@ from qiskit_aer.primitives import Sampler as AerSampler
 
 # Graph colouring Qubo Quadratic Program
 
+def _resolve_hamiltonians_path():
+    candidates = [
+        Path("/home/btalbot/links/projects/def-stijn/btalbot/op_min/hamiltonians/"),  # Trillium
+        Path("/home/btalbot/projects/def-stijn/btalbot/op_min/hamiltonians/"),  # Siku
+        Path(__file__).resolve().parent / "hamiltonians",
+    ]
+
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate.resolve()) + "/"
+
+    return str((Path(__file__).resolve().parent / "hamiltonians").resolve()) + "/"
+
+
+hamiltonians_path = _resolve_hamiltonians_path()
+
+
+def color_bit_width(num_colors: int) -> int:
+    if num_colors <= 1:
+        return 1
+    return math.ceil(math.log2(num_colors))
+
+
+def add_negated_square(terms, scale, add_linear, add_quadratic):
+    for i, (var_i, coeff_i) in enumerate(terms):
+        add_linear(var_i, -scale * coeff_i * coeff_i)
+        for var_j, coeff_j in terms[i + 1 :]:
+            add_quadratic(var_i, var_j, -2.0 * scale * coeff_i * coeff_j)
+
 def adjacency_matrix_to_list(A):
     graph = {}
     n = len(A)
@@ -45,11 +73,19 @@ def adjacency_matrix_to_list(A):
     return graph
 
 def space_efficient_qp_surrogate(A, num_colors, C=10.0):
+    """
+    First-order QUBO surrogate for the binary/Gray graph-colouring embedding.
+
+    For an edge (u, v), the exact same-colour indicator is the product of bitwise
+    equality terms. Truncating that product after the linear term yields a reward
+    for bit mismatches, so minimization pushes adjacent vertices away from the
+    same encoded colour without introducing ancillas.
+    """
     qp = QuadraticProgram()
     graph = adjacency_matrix_to_list(A)
 
     nodes = list(graph.keys())
-    m = math.ceil(math.log2(num_colors))
+    m = color_bit_width(num_colors)
 
     b = {}
     for v in nodes:
@@ -75,71 +111,18 @@ def space_efficient_qp_surrogate(A, num_colors, C=10.0):
                 continue
 
             for l in range(m):
-                bu = b[(u, l)]
-                bv = b[(v, l)]
-
-                # (bu - bv)^2 = bu + bv - 2 bu*bv
-                add_linear(bu, C)
-                add_linear(bv, C)
-                add_quadratic(bu, bv, -2 * C)
-
-    # 🔒 Optional: restrict invalid colors
-    if num_colors < 2**m:
-        for v in nodes:
-            coeffs = {b[(v, l)]: 2**l for l in range(m)}
-            qp.linear_constraint(coeffs, "<=", num_colors - 1)
+                add_negated_square(
+                    [(b[(u, l)], 1.0), (b[(v, l)], -1.0)],
+                    C,
+                    add_linear,
+                    add_quadratic,
+                )
 
     qp.minimize(linear=linear, quadratic=quadratic)
     return qp
 
 def space_efficient_qp(A, num_colors, C=10.0, D=1.0):
-    qp = QuadraticProgram()
-    graph = adjacency_matrix_to_list(A)
-
-    nodes = list(graph.keys())
-    m = math.ceil(math.log2(num_colors))
-
-    # --- Variables: b_{v,l}
-    b = {}
-    for v in nodes:
-        for l in range(m):
-            name = f"b_{v}_{l}"
-            qp.binary_var(name)
-            b[(v, l)] = name
-
-    linear = {}
-    quadratic = {}
-    constant = 0
-
-
-    def add_linear(var, coeff):
-        linear[var] = linear.get(var, 0) + coeff
-
-    def add_quadratic(v1, v2, coeff):
-        key = tuple(sorted([v1, v2]))
-        quadratic[key] = quadratic.get(key, 0) + coeff
-
-    for u in nodes:
-        for v in graph[u]:
-            if u >= v:
-                continue
-
-            for l in range(m):
-                bu = b[(u, l)]
-                bv = b[(v, l)]
-
-                # (bu - bv)^2 = bu + bv - 2 bu*bv
-                add_linear(bu, C)
-                add_linear(bv, D)
-                add_quadratic(bu, bv, -2 * D)
-            
-    if num_colors < 2**m:
-        for v in nodes:
-            coeffs = {b[(v, l)]: 2**l for l in range(m)}
-            qp.linear_constraint(coeffs, "<=", num_colors - 1)
-
-    qp.minimize(linear=linear, quadratic=quadratic, constant=constant)
-    return qp
+    return space_efficient_qp_surrogate(A, num_colors, C=C)
 
 def graph_colouring_qubo_qp(A: list[list[int]], k: int, C: int, D: int, name:str="graph_colouring_qubo"):
     """
@@ -347,12 +330,173 @@ class PauliGroupingInfo:
     vertices: list[int]
     C: int
     D: int
+    raw_colours: list[int] | None = None
+    repaired_colours: list[int] | None = None
+    groups: list[list[int]] | None = None
+    raw_conflicts: int | None = None
+    repaired_conflicts: int | None = None
+    invalid_vertices: list[int] | None = None
 
 def int_to_bits(x, m):
     return [(x >> i) & 1 for i in range(m)]
 
-from qiskit import QuantumCircuit
-from itertools import product
+def bits_to_int(bits):
+    value = 0
+    for i, bit in enumerate(bits):
+        value |= int(bit) << i
+    return value
+
+def color_to_gray(color):
+    return color ^ (color >> 1)
+
+def gray_to_color(gray_value):
+    color = 0
+    while gray_value:
+        color ^= gray_value
+        gray_value >>= 1
+    return color
+
+def color_to_bits(color, m):
+    return int_to_bits(color_to_gray(color), m)
+
+def bits_to_color(bits):
+    return gray_to_color(bits_to_int(bits))
+
+def count_colour_conflicts(A, colours):
+    conflicts = 0
+    for v, w in combinations(range(len(colours)), 2):
+        if A[v][w] == 1 and colours[v] == colours[w]:
+            conflicts += 1
+    return conflicts
+
+def local_conflicts(A, colours, vertex, colour, num_colors):
+    conflicts = 0
+    for neighbour, edge in enumerate(A[vertex]):
+        if vertex == neighbour or edge != 1:
+            continue
+        neighbour_colour = colours[neighbour]
+        if 0 <= neighbour_colour < num_colors and neighbour_colour == colour:
+            conflicts += 1
+    return conflicts
+
+def repair_colouring(A, colours, num_colors):
+    repaired = list(colours)
+    n = len(repaired)
+    degrees = [sum(row) for row in A]
+    order = sorted(range(n), key=lambda vertex: degrees[vertex], reverse=True)
+
+    for vertex in order:
+        if 0 <= repaired[vertex] < num_colors:
+            continue
+        repaired[vertex] = min(
+            range(num_colors),
+            key=lambda colour: local_conflicts(A, repaired, vertex, colour, num_colors),
+        )
+
+    for _ in range(max(1, n)):
+        improved = False
+        for vertex in order:
+            current = repaired[vertex]
+            current_conflicts = local_conflicts(A, repaired, vertex, current, num_colors)
+            best_colour = current
+            best_conflicts = current_conflicts
+
+            for colour in range(num_colors):
+                if colour == current:
+                    continue
+                candidate_conflicts = local_conflicts(A, repaired, vertex, colour, num_colors)
+                if candidate_conflicts < best_conflicts:
+                    best_colour = colour
+                    best_conflicts = candidate_conflicts
+
+            if best_colour != current:
+                repaired[vertex] = best_colour
+                improved = True
+
+        if not improved:
+            break
+
+    return repaired
+
+def colouring_to_groups(colours, num_colors):
+    groups = defaultdict(list)
+    for vertex, colour in enumerate(colours):
+        if 0 <= colour < num_colors:
+            groups[colour].append(vertex)
+    return [groups[colour] for colour in range(num_colors) if groups[colour]]
+
+def extract_variable_values(x, variable_names):
+    return {
+        name: int(round(value))
+        for name, value in zip(variable_names, x)
+    }
+
+def decode_binary_colouring(variable_values, n, num_colors):
+    m = color_bit_width(num_colors)
+    colours = []
+    invalid_vertices = []
+
+    for vertex in range(n):
+        bits = [variable_values.get(f"b_{vertex}_{bit}", 0) for bit in range(m)]
+        colour = bits_to_color(bits)
+        colours.append(colour)
+        if colour >= num_colors:
+            invalid_vertices.append(vertex)
+
+    return colours, invalid_vertices
+
+def postprocess_binary_result(result, qubo: QuadraticProgram, A, num_colors):
+    variable_names = [variable.name for variable in qubo.variables]
+    candidate_vectors = []
+
+    if getattr(result, "samples", None):
+        candidate_vectors.extend(sample.x for sample in result.samples)
+    if getattr(result, "x", None) is not None:
+        candidate_vectors.append(result.x)
+
+    best_summary = None
+    for vector in candidate_vectors:
+        variable_values = extract_variable_values(vector, variable_names)
+        raw_colours, invalid_vertices = decode_binary_colouring(
+            variable_values,
+            len(A),
+            num_colors,
+        )
+        repaired_colours = repair_colouring(A, raw_colours, num_colors)
+        summary = {
+            "raw_colours": raw_colours,
+            "repaired_colours": repaired_colours,
+            "groups": colouring_to_groups(repaired_colours, num_colors),
+            "raw_conflicts": count_colour_conflicts(A, raw_colours),
+            "repaired_conflicts": count_colour_conflicts(A, repaired_colours),
+            "invalid_vertices": invalid_vertices,
+        }
+        rank = (
+            summary["repaired_conflicts"],
+            len(summary["invalid_vertices"]),
+            summary["raw_conflicts"],
+        )
+        if best_summary is None or rank < best_summary[0]:
+            best_summary = (rank, summary)
+
+    return best_summary[1] if best_summary is not None else None
+
+def print_grouping_summary(pauli_grouping_info: PauliGroupingInfo):
+    if pauli_grouping_info.repaired_colours is None:
+        print("No decoded grouping summary available.")
+        return
+
+    print("\nDecoded colouring (Gray encoding):")
+    print(pauli_grouping_info.raw_colours)
+    print("Conflicting non-QWC edges before repair:", pauli_grouping_info.raw_conflicts)
+
+    if pauli_grouping_info.invalid_vertices:
+        print("Invalid colour encodings repaired at vertices:", pauli_grouping_info.invalid_vertices)
+
+    print("\nGreedy-repaired colouring:")
+    print(pauli_grouping_info.repaired_colours)
+    print("Conflicting non-QWC edges after repair:", pauli_grouping_info.repaired_conflicts)
+    print("Measurement groups:", pauli_grouping_info.groups)
 
 def vertex_binary_mixer(qc, qubits, k, beta):
     """
@@ -364,38 +508,43 @@ def vertex_binary_mixer(qc, qubits, k, beta):
     m = len(qubits)
 
     for c in range(k - 1):
-        bits_c = int_to_bits(c, m)
-        bits_cp1 = int_to_bits(c + 1, m)
+        bits_c = color_to_bits(c, m)
+        bits_cp1 = color_to_bits(c + 1, m)
 
         # Find which bits differ
         diff = [i for i in range(m) if bits_c[i] != bits_cp1[i]]
+        if len(diff) != 1:
+            raise ValueError(
+                "Gray-coded neighbouring colours must differ by exactly one bit."
+            )
 
         # Apply controlled rotation between the two states
         # We implement a multi-controlled RX
 
         controls = []
-        target = None
+        target = qubits[diff[0]]
 
         for i in range(m):
-            if i in diff:
-                target = qubits[i]
+            if i == diff[0]:
+                continue
+            if bits_c[i] == 1:
+                controls.append(qubits[i])
             else:
-                if bits_c[i] == 1:
-                    controls.append(qubits[i])
-                else:
-                    qc.x(qubits[i])
-                    controls.append(qubits[i])
+                qc.x(qubits[i])
+                controls.append(qubits[i])
 
-        if target is not None and controls != []:
+        if controls:
             qc.mcrx(2 * beta, controls, target)
+        else:
+            qc.rx(2 * beta, target)
 
         # Undo X gates
         for i in range(m):
-            if i not in diff and bits_c[i] == 0:
+            if i != diff[0] and bits_c[i] == 0:
                 qc.x(qubits[i])
 
 def binary_coloring_mixer(n, k, beta):
-    m = math.ceil(math.log2(k))
+    m = color_bit_width(k)
     qc = QuantumCircuit(n * m)
 
     for v in range(n):
@@ -405,12 +554,12 @@ def binary_coloring_mixer(n, k, beta):
     return qc
 
 def binary_initial_state(n, k):
-    m = math.ceil(math.log2(k))
+    m = color_bit_width(k)
     qc = QuantumCircuit(n * m)
 
     for v in range(n):
         c = v % k
-        bits = int_to_bits(c, m)
+        bits = color_to_bits(c, m)
 
         for i, bit in enumerate(bits):
             if bit == 1:
@@ -419,6 +568,11 @@ def binary_initial_state(n, k):
     return qc
 
 def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level: int, service: QiskitRuntimeService | None, simulation: bool = True):
+    algorithm_globals.random_seed = 42
+    qubo = QuadraticProgramToQubo().convert(qp)
+    initial_point = [0.1] * (2 * reps)
+    num_qubits = len(qubo.variables)
+
     result = None
     if simulation == False:
         backend = service.least_busy(simulator=False)
@@ -439,60 +593,60 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
             sampler=sampler,
             optimizer=optimizer,
             reps=reps,
-            pass_manager=pm
+            pass_manager=pm,
+            initial_state=binary_initial_state(n, k),
+            mixer=binary_coloring_mixer(n, k, beta=Parameter('beta')),
+            initial_point=initial_point,
         )
 
         # Wrap QAOA as an optimizer for QuadraticProgram
         solver = MinimumEigenOptimizer(qaoa)
 
         # Solve
-        result = solver.solve(qp)
+        result = solver.solve(qubo)
     
     else:
-        backend_options = dict(
-            method="matrix_product_state",
-            max_parallel_threads=6,
-            matrix_product_state_max_bond_dimension=32,
-            matrix_product_state_truncation_threshold=1e-8,
-            max_memory_mb=700000,
-        )
-        
-        qubo = qubo = QuadraticProgramToQubo().convert(qp)
+        if num_qubits <= 20:
+            qaoa = QAOA(
+                sampler=StatevectorSampler(),
+                optimizer=COBYLA(maxiter=200),
+                reps=reps,
+                initial_state=binary_initial_state(n, k),
+                mixer=binary_coloring_mixer(n, k, beta=Parameter('beta')),
+                initial_point=initial_point,
+            )
+        else:
+            backend_options = dict(
+                method="matrix_product_state",
+                max_parallel_threads=6,
+                matrix_product_state_max_bond_dimension=32,
+                matrix_product_state_truncation_threshold=1e-8,
+                max_memory_mb=700000,
+            )
 
-        spsa = SPSA(
-            maxiter=300,
-            learning_rate=0.05,
-            perturbation=0.1,
-            blocking=True,
-            allowed_increase=0.01
-        )
+            spsa = SPSA(
+                maxiter=300,
+                learning_rate=0.05,
+                perturbation=0.1,
+                blocking=True,
+                allowed_increase=0.01
+            )
 
-        qaoa = QAOA(
-            sampler=AerSampler(
-                run_options={'shots': 256},
-                backend_options=backend_options
-            ),
-            optimizer=COBYLA(),
-            reps=reps,
-            initial_state=binary_initial_state(n, k),
-            mixer=binary_coloring_mixer(n, k, beta=Parameter('beta')),
-            initial_point=[0.1] * (1 * reps)
-        )
+            qaoa = QAOA(
+                sampler=AerSampler(
+                    run_options={'shots': 256},
+                    backend_options=backend_options
+                ),
+                optimizer=spsa,
+                reps=reps,
+                initial_state=binary_initial_state(n, k),
+                mixer=binary_coloring_mixer(n, k, beta=Parameter('beta')),
+                initial_point=initial_point,
+            )
 
         optimizer = MinimumEigenOptimizer(qaoa)
         result = optimizer.solve(qubo)
-
-        subs = {
-            'b_0_0': 0,
-            'b_1_0': 0,
-            'b_2_0': 0,
-            'b_3_0': 0,
-            'b_4_0': 1,
-            'b_5_0': 1,
-            'b_6_0': 1
-        }
-        substitute_solution(qp, subs)
-    return result
+    return result, qubo
 
 def get_results(pauli_grouping_info: PauliGroupingInfo, job_result: dict | None = None, service: QiskitRuntimeService | None = None, job_id: str | None = None):
     if service is not None and job_id is not None:
@@ -546,7 +700,7 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
     
     # qp = graph_colouring_qubo_qp(A_comp, k, C, D)
 
-    qp = space_efficient_qp_surrogate(A_comp, num_colors=k)
+    qp = space_efficient_qp_surrogate(A_comp, num_colors=k, C=C)
     # print(qp.prettyprint())
 
     service = None
@@ -555,7 +709,24 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
             channel="ibm_quantum_platform",
             token=api_key
         )
-    result = run_qaoa(qp, reps, pauli_grouping_info.n, k, optimization_level, service)
+    result, qubo = run_qaoa(
+        qp,
+        reps,
+        pauli_grouping_info.n,
+        k,
+        optimization_level,
+        service,
+        simulation=simulation,
+    )
+
+    postprocessed = postprocess_binary_result(result, qubo, A_comp, k)
+    if postprocessed is not None:
+        pauli_grouping_info.raw_colours = postprocessed["raw_colours"]
+        pauli_grouping_info.repaired_colours = postprocessed["repaired_colours"]
+        pauli_grouping_info.groups = postprocessed["groups"]
+        pauli_grouping_info.raw_conflicts = postprocessed["raw_conflicts"]
+        pauli_grouping_info.repaired_conflicts = postprocessed["repaired_conflicts"]
+        pauli_grouping_info.invalid_vertices = postprocessed["invalid_vertices"]
 
     return (pauli_grouping_info, result)
     
@@ -565,20 +736,6 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
     #     groups[colour].append(i)
 
     # return list(groups.values())
-
-def substitute_solution(qp, subs):
-    # subs = {
-    #     'x_0_0': 1,
-    #     'x_0_1': 0,
-    #     'x_1_0': 1,
-    #     'x_1_1': 0,
-    #     'x_2_0': 1,
-    #     'x_2_1': 0,
-    #     # etc.
-    # }
-
-    print('Optimal solution:', qp.substitute_variables(subs))
-
 
 # Variable Definitions
 

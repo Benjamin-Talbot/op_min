@@ -24,3 +24,4 @@ print(result.prettyprint())
 
 print()
 print(result.x)
+print_grouping_summary(pauli_grouping_info)
