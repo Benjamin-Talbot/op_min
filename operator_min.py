@@ -44,6 +44,54 @@ def adjacency_matrix_to_list(A):
         graph[i] = [j for j in range(n) if A[i][j] == 1]
     return graph
 
+def space_efficient_qp_surrogate(A, num_colors, C=10.0):
+    qp = QuadraticProgram()
+    graph = adjacency_matrix_to_list(A)
+
+    nodes = list(graph.keys())
+    m = math.ceil(math.log2(num_colors))
+
+    b = {}
+    for v in nodes:
+        for l in range(m):
+            name = f"b_{v}_{l}"
+            qp.binary_var(name)
+            b[(v, l)] = name
+
+    linear = {}
+    quadratic = {}
+
+    def add_linear(var, coeff):
+        linear[var] = linear.get(var, 0) + coeff
+
+    def add_quadratic(v1, v2, coeff):
+        key = tuple(sorted([v1, v2]))
+        quadratic[key] = quadratic.get(key, 0) + coeff
+
+    # 🔵 Surrogate edge constraint
+    for u in nodes:
+        for v in graph[u]:
+            if u >= v:
+                continue
+
+            for l in range(m):
+                bu = b[(u, l)]
+                bv = b[(v, l)]
+
+                # (bu - bv)^2 = bu + bv - 2 bu*bv
+                add_linear(bu, C)
+                add_linear(bv, C)
+                add_quadratic(bu, bv, -2 * C)
+
+    # 🔒 Optional: restrict invalid colors
+    if num_colors < 2**m:
+        for v in nodes:
+            coeffs = {b[(v, l)]: 2**l for l in range(m)}
+            qp.linear_constraint(coeffs, "<=", num_colors - 1)
+
+    qp.minimize(linear=linear, quadratic=quadratic)
+    return qp
+
 def space_efficient_qp(A, num_colors, C=10.0, D=1.0):
     qp = QuadraticProgram()
     graph = adjacency_matrix_to_list(A)
@@ -76,75 +124,15 @@ def space_efficient_qp(A, num_colors, C=10.0, D=1.0):
             if u >= v:
                 continue
 
-            # Start with constant term
-            terms = [({}, 1.0)]  # (monomial dict, coeff)
-
             for l in range(m):
                 bu = b[(u, l)]
                 bv = b[(v, l)]
 
-                new_terms = []
-
-                for mon, coeff in terms:
-                    # multiply by (1 - bu - bv + 2 bu bv)
-
-                    # 1
-                    new_terms.append((mon.copy(), coeff))
-
-                    # -bu
-                    mon1 = mon.copy()
-                    mon1[bu] = mon1.get(bu, 0) + 1
-                    new_terms.append((mon1, -coeff))
-
-                    # -bv
-                    mon2 = mon.copy()
-                    mon2[bv] = mon2.get(bv, 0) + 1
-                    new_terms.append((mon2, -coeff))
-
-                    # +2 bu bv
-                    mon3 = mon.copy()
-                    mon3[bu] = mon3.get(bu, 0) + 1
-                    mon3[bv] = mon3.get(bv, 0) + 1
-                    new_terms.append((mon3, 2 * coeff))
-
-                terms = new_terms
-
-            for mon, coeff in terms:
-                coeff *= C
-
-                vars_list = []
-                for var, power in mon.items():
-                    vars_list.extend([var] * power)
-
-                if len(vars_list) == 0:
-                    constant += coeff
-
-                elif len(vars_list) == 1:
-                    add_linear(vars_list[0], coeff)
-
-                elif len(vars_list) == 2:
-                    add_quadratic(vars_list[0], vars_list[1], coeff)
-
-                else:
-                    # introduce auxiliary variable
-                    aux = "_aux_" + "_".join(vars_list)
-                    qp.binary_var(aux)
-
-                    k = len(vars_list)
-
-                    # aux <= each var
-                    for var in vars_list:
-                        qp.linear_constraint({aux: 1, var: -1}, "<=", 0)
-
-                    # aux >= sum(vars) - (k-1)
-                    qp.linear_constraint(
-                        {aux: 1, **{v: -1 for v in vars_list}},
-                        ">=",
-                        -(k - 1)
-                    )
-
-                    add_linear(aux, coeff)
-
+                # (bu - bv)^2 = bu + bv - 2 bu*bv
+                add_linear(bu, C)
+                add_linear(bv, D)
+                add_quadratic(bu, bv, -2 * D)
+            
     if num_colors < 2**m:
         for v in nodes:
             coeffs = {b[(v, l)]: 2**l for l in range(m)}
@@ -486,9 +474,9 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
             ),
             optimizer=COBYLA(),
             reps=reps,
-            # initial_state=binary_initial_state(n, k),
-            # mixer=binary_coloring_mixer(n, k, beta=Parameter('beta')),
-            initial_point=[0.1] * (2 * reps)
+            initial_state=binary_initial_state(n, k),
+            mixer=binary_coloring_mixer(n, k, beta=Parameter('beta')),
+            initial_point=[0.1] * (1 * reps)
         )
 
         optimizer = MinimumEigenOptimizer(qaoa)
@@ -558,7 +546,7 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
     
     # qp = graph_colouring_qubo_qp(A_comp, k, C, D)
 
-    qp = space_efficient_qp(A_comp, num_colors=k)
+    qp = space_efficient_qp_surrogate(A_comp, num_colors=k)
     # print(qp.prettyprint())
 
     service = None
@@ -594,7 +582,7 @@ def substitute_solution(qp, subs):
 
 # Variable Definitions
 
-C = 100
-D = 10
+C = 10
+D = 1
 reps = 3
 optimization_level = 2
