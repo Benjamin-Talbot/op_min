@@ -18,7 +18,9 @@ pauli_grouping_info, result = pauli_grouping(paulis, C, D, k, reps, optimization
 
 if ham_repr:
     print('Result:', result.best_measurement['bitstring'])
-    print('Cost value:', result.cost_function_evals)
+    print('Objective value:', result.best_measurement['value'])
+    print('Cost function evaluations:', result.cost_function_evals)
+    print_grouping_summary(pauli_grouping_info)
 else:
     print("Number of samples:", len(result.samples))
     print()
@@ -28,3 +30,4 @@ else:
 
     print()
     print(result.x)
+    print_grouping_summary(pauli_grouping_info)

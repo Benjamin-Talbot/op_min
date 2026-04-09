@@ -45,12 +45,55 @@ def adjacency_matrix_to_list(A):
         graph[i] = [j for j in range(n) if A[i][j] == 1]
     return graph
 
+def color_bit_width(num_colors: int) -> int:
+    if num_colors <= 1:
+        return 1
+    return math.ceil(math.log2(num_colors))
+
+def int_to_bits(x, m):
+    return [(x >> i) & 1 for i in range(m)]
+
+def bits_to_int(bits):
+    value = 0
+    for i, bit in enumerate(bits):
+        value |= int(bit) << i
+    return value
+
+def color_to_gray(color):
+    return color ^ (color >> 1)
+
+def gray_to_color(gray_value):
+    color = 0
+    while gray_value:
+        color ^= gray_value
+        gray_value >>= 1
+    return color
+
+def color_to_bits(color, m):
+    return int_to_bits(color_to_gray(color), m)
+
+def bits_to_color(bits):
+    return gray_to_color(bits_to_int(bits))
+
+def graph_edges(graph):
+    if isinstance(graph, dict):
+        for u, neighbours in graph.items():
+            for v in neighbours:
+                if u < v:
+                    yield u, v
+        return
+
+    for u in range(len(graph)):
+        for v in range(u + 1, len(graph)):
+            if graph[u][v] == 1:
+                yield u, v
+
 def space_efficient_qp(A, num_colors, C=10.0, D=1.0):
     qp = QuadraticProgram()
     graph = adjacency_matrix_to_list(A)
 
     nodes = list(graph.keys())
-    m = math.ceil(math.log2(num_colors))
+    m = color_bit_width(num_colors)
 
     # --- Variables: b_{v,l}
     b = {}
@@ -279,16 +322,7 @@ def complement_graph(A):
     return A_comp
 
 def build_commutation_graph(paulis):
-    n = len(paulis)
-    A = np.zeros((n, n), dtype=int)
-
-    for i in range(n):
-        for j in range(i + 1, n):
-            if qwc(paulis.paulis[i], paulis.paulis[j]):
-                A[i, j] = 1
-                A[j, i] = 1
-
-    return A
+    return np.array(generate_qwc_graph(paulis), dtype=int)
 
 import itertools
 import math
@@ -310,56 +344,64 @@ def projector_term(n_qubits, qubit_indices, bitstring):
                 coeff *= 0.5
             else:
                 coeff *= 0.5 * (1 if bit == 0 else -1)
-                pauli[q] = "Z"
+                # SparsePauliOp labels are ordered q_{n-1} ... q_0.
+                pauli[n_qubits - 1 - q] = "Z"
 
         terms.append(("".join(pauli), coeff))
 
     return SparsePauliOp.from_list(terms)
 
-def binary_coloring_hamiltonian(graph, k, A=10.0, B=1.0):
+def space_efficient_coloring_hamiltonian(graph, k, invalid_penalty=0.0, conflict_penalty=1.0):
+    if not isinstance(graph, dict):
+        graph = adjacency_matrix_to_list(graph)
+
     n = len(graph)
-    m = math.ceil(math.log2(k))
+    m = color_bit_width(k)
     n_qubits = n * m
 
     H = SparsePauliOp.from_list([("I" * n_qubits, 0.0)])
 
-    # --- INVALID COLOR PENALTY ---
-    for v in range(n):
-        qubits = [v * m + i for i in range(m)]
+    # When the mixer preserves the valid-color subspace these terms are
+    # unnecessary, but keeping them optional makes the Hamiltonian usable
+    # outside the constrained ansatz as well.
+    if invalid_penalty != 0.0 and k < 2**m:
+        for v in range(n):
+            qubits = [v * m + i for i in range(m)]
 
-        for c in range(k, 2**m):
-            bits = [(c >> i) & 1 for i in range(m)]
-            P = projector_term(n_qubits, qubits, bits)
-            H += A * P
+            for c in range(k, 2**m):
+                P = projector_term(n_qubits, qubits, color_to_bits(c, m))
+                H += invalid_penalty * P
 
     # --- EDGE PENALTY ---
-    for u in graph:
-        for v in graph[u]:
-            if u < v:
-                qubits_u = [u * m + i for i in range(m)]
-                qubits_v = [v * m + i for i in range(m)]
+    for u, v in graph_edges(graph):
+        qubits_u = [u * m + i for i in range(m)]
+        qubits_v = [v * m + i for i in range(m)]
 
-                for c in range(k):
-                    bits = [(c >> i) & 1 for i in range(m)]
-
-                    P_u = projector_term(n_qubits, qubits_u, bits)
-                    P_v = projector_term(n_qubits, qubits_v, bits)
-
-                    H += B * (P_u @ P_v)
+        for c in range(k):
+            bits = color_to_bits(c, m)
+            P_u = projector_term(n_qubits, qubits_u, bits)
+            P_v = projector_term(n_qubits, qubits_v, bits)
+            H += conflict_penalty * (P_u @ P_v)
 
     return H.simplify()
 
-def build_cost_hamiltonian(paulis, k):
-    A = build_commutation_graph(paulis)
+def binary_coloring_hamiltonian(graph, k, A=10.0, B=1.0):
+    return space_efficient_coloring_hamiltonian(
+        graph,
+        k,
+        invalid_penalty=A,
+        conflict_penalty=B,
+    )
 
-    # complement graph (non-commuting edges)
-    A_comp = 1 - A
-    np.fill_diagonal(A_comp, 0)
-
-    A_comp = adjacency_matrix_to_list(A_comp)
-    H = binary_coloring_hamiltonian(A_comp, k)
-
-    return H
+def build_cost_hamiltonian(paulis, k, invalid_penalty=0.0, conflict_penalty=1.0):
+    qwc_graph = generate_qwc_graph(paulis)
+    conflict_graph = complement_graph(qwc_graph)
+    return space_efficient_coloring_hamiltonian(
+        conflict_graph,
+        k,
+        invalid_penalty=invalid_penalty,
+        conflict_penalty=conflict_penalty,
+    )
 
 
 
@@ -444,120 +486,195 @@ class PauliGroupingInfo:
     vertices: list[int]
     C: int
     D: int
+    raw_colours: list[int] | None = None
+    repaired_colours: list[int] | None = None
+    groups: list[list[int]] | None = None
+    raw_conflicts: int | None = None
+    repaired_conflicts: int | None = None
+    invalid_vertices: list[int] | None = None
 
-def int_to_bits(x, m):
-    return [(x >> i) & 1 for i in range(m)]
+def count_colour_conflicts(A, colours, num_colors):
+    conflicts = 0
+    for v, w in combinations(range(len(colours)), 2):
+        if A[v][w] == 1 and 0 <= colours[v] < num_colors and colours[v] == colours[w]:
+            conflicts += 1
+    return conflicts
 
-from qiskit import QuantumCircuit
-from itertools import product
+def local_conflicts(A, colours, vertex, colour, num_colors):
+    conflicts = 0
+    for neighbour, edge in enumerate(A[vertex]):
+        if neighbour == vertex or edge != 1:
+            continue
+        neighbour_colour = colours[neighbour]
+        if 0 <= neighbour_colour < num_colors and neighbour_colour == colour:
+            conflicts += 1
+    return conflicts
 
-def vertex_binary_mixer(qc, qubits, k, beta):
-    """
-    qc: QuantumCircuit
-    qubits: list of qubits for this vertex
-    k: number of colors
-    beta: QAOA parameter
-    """
-    m = len(qubits)
+def repair_colouring(A, colours, num_colors):
+    repaired = list(colours)
+    degrees = [sum(row) for row in A]
+    order = sorted(range(len(repaired)), key=lambda vertex: degrees[vertex], reverse=True)
 
-    for c in range(k - 1):
-        bits_c = int_to_bits(c, m)
-        bits_cp1 = int_to_bits(c + 1, m)
+    for vertex in order:
+        if 0 <= repaired[vertex] < num_colors:
+            continue
+        repaired[vertex] = min(
+            range(num_colors),
+            key=lambda colour: local_conflicts(A, repaired, vertex, colour, num_colors),
+        )
 
-        # Find which bits differ
-        diff = [i for i in range(m) if bits_c[i] != bits_cp1[i]]
+    for _ in range(max(1, len(repaired))):
+        improved = False
+        for vertex in order:
+            current = repaired[vertex]
+            best_colour = current
+            best_conflicts = local_conflicts(A, repaired, vertex, current, num_colors)
 
-        # Apply controlled rotation between the two states
-        # We implement a multi-controlled RX
+            for colour in range(num_colors):
+                if colour == current:
+                    continue
+                candidate_conflicts = local_conflicts(A, repaired, vertex, colour, num_colors)
+                if candidate_conflicts < best_conflicts:
+                    best_colour = colour
+                    best_conflicts = candidate_conflicts
 
-        controls = []
-        target = None
+            if best_colour != current:
+                repaired[vertex] = best_colour
+                improved = True
 
-        for i in range(m):
-            if i in diff:
-                target = qubits[i]
-            else:
-                if bits_c[i] == 1:
-                    controls.append(qubits[i])
-                else:
-                    qc.x(qubits[i])
-                    controls.append(qubits[i])
+        if not improved:
+            break
 
-        if target is not None and controls != []:
-            qc.mcrx(2 * beta, controls, target)
+    return repaired
 
-        # Undo X gates
-        for i in range(m):
-            if i not in diff and bits_c[i] == 0:
-                qc.x(qubits[i])
+def colouring_to_groups(colours, num_colors):
+    groups = defaultdict(list)
+    for vertex, colour in enumerate(colours):
+        if 0 <= colour < num_colors:
+            groups[colour].append(vertex)
+    return [groups[colour] for colour in range(num_colors) if groups[colour]]
 
-def binary_coloring_mixer(n, k, beta):
-    m = math.ceil(math.log2(k))
-    qc = QuantumCircuit(n * m)
+def decode_bitstring(bitstring, n, k):
+    m = color_bit_width(k)
+    little_endian_bits = bitstring[::-1]
+    colours = []
+    invalid_vertices = []
 
-    for v in range(n):
-        qubits = [v * m + i for i in range(m)]
-        vertex_binary_mixer(qc, qubits, k, beta)
+    for vertex in range(n):
+        bits = [int(little_endian_bits[vertex * m + offset]) for offset in range(m)]
+        colour = bits_to_color(bits)
+        colours.append(colour)
+        if colour >= k:
+            invalid_vertices.append(vertex)
 
-    return qc
+    return colours, invalid_vertices
 
-def binary_initial_state(n, k):
-    m = math.ceil(math.log2(k))
-    qc = QuantumCircuit(n * m)
+def populate_grouping_summary(pauli_grouping_info: PauliGroupingInfo, colours, invalid_vertices):
+    repaired_colours = repair_colouring(pauli_grouping_info.A_comp, colours, len(pauli_grouping_info.colours))
+    pauli_grouping_info.raw_colours = colours
+    pauli_grouping_info.repaired_colours = repaired_colours
+    pauli_grouping_info.groups = colouring_to_groups(repaired_colours, len(pauli_grouping_info.colours))
+    pauli_grouping_info.raw_conflicts = count_colour_conflicts(pauli_grouping_info.A_comp, colours, len(pauli_grouping_info.colours))
+    pauli_grouping_info.repaired_conflicts = count_colour_conflicts(pauli_grouping_info.A_comp, repaired_colours, len(pauli_grouping_info.colours))
+    pauli_grouping_info.invalid_vertices = invalid_vertices
 
-    for v in range(n):
-        c = v % k
-        bits = int_to_bits(c, m)
+def print_grouping_summary(pauli_grouping_info: PauliGroupingInfo):
+    if pauli_grouping_info.repaired_colours is None:
+        print("No decoded grouping summary available.")
+        return
 
-        for i, bit in enumerate(bits):
-            if bit == 1:
-                qc.x(v * m + i)
+    print("\nDecoded colouring:")
+    print(pauli_grouping_info.raw_colours)
+    print("Conflicting non-QWC edges before repair:", pauli_grouping_info.raw_conflicts)
 
-    return qc
+    if pauli_grouping_info.invalid_vertices:
+        print("Invalid colour encodings repaired at vertices:", pauli_grouping_info.invalid_vertices)
 
-def int_to_bits(x, m):
-    return [(x >> i) & 1 for i in range(m)]
+    print("\nGreedy-repaired colouring:")
+    print(pauli_grouping_info.repaired_colours)
+    print("Conflicting non-QWC edges after repair:", pauli_grouping_info.repaired_conflicts)
+    print("Measurement groups:", pauli_grouping_info.groups)
+
+def apply_color_transition(qc, qubits, source_bits, target_bits, beta):
+    diff = [i for i in range(len(qubits)) if source_bits[i] != target_bits[i]]
+    if len(diff) != 1:
+        raise ValueError("Adjacent Gray codewords must differ by exactly one bit.")
+
+    target = qubits[diff[0]]
+    controls = []
+
+    for i in range(len(qubits)):
+        if i == diff[0]:
+            continue
+
+        if source_bits[i] == 1:
+            controls.append(qubits[i])
+        else:
+            qc.x(qubits[i])
+            controls.append(qubits[i])
+
+    if controls:
+        qc.mcrx(2 * beta, controls, target)
+    else:
+        qc.rx(2 * beta, target)
+
+    for i in range(len(qubits)):
+        if i != diff[0] and source_bits[i] == 0:
+            qc.x(qubits[i])
 
 def gray_code_mixer(n, k, beta):
-    m = math.ceil(math.log2(k))
+    m = color_bit_width(k)
     qc = QuantumCircuit(n * m)
 
     for v in range(n):
         qubits = [v * m + i for i in range(m)]
 
         for c in range(k - 1):
-            bits_c = int_to_bits(c, m)
-            bits_cp1 = int_to_bits(c + 1, m)
-
-            # find differing bit
-            diff = [i for i in range(m) if bits_c[i] != bits_cp1[i]]
-            if len(diff) != 1:
-                continue  # skip non-Gray transitions
-
-            target = qubits[diff[0]]
-
-            controls = []
-            for i in range(m):
-                if i == diff[0]:
-                    continue
-
-                if bits_c[i] == 1:
-                    controls.append(qubits[i])
-                else:
-                    qc.x(qubits[i])
-                    controls.append(qubits[i])
-
-            if controls:
-                qc.mcrx(2 * beta, controls, target)
-
-            # undo X gates
-            for i in range(m):
-                if i != diff[0] and bits_c[i] == 0:
-                    qc.x(qubits[i])
+            apply_color_transition(
+                qc,
+                qubits,
+                color_to_bits(c, m),
+                color_to_bits(c + 1, m),
+                beta,
+            )
 
     return qc
 
+def binary_coloring_mixer(n, k, beta):
+    return gray_code_mixer(n, k, beta)
+
+def binary_initial_state(n, k):
+    m = color_bit_width(k)
+    qc = QuantumCircuit(n * m)
+
+    for v in range(n):
+        bits = color_to_bits(v % k, m)
+        for i, bit in enumerate(bits):
+            if bit == 1:
+                qc.x(v * m + i)
+
+    return qc
+
+def validate_direct_qaoa_dimensions(H, n, k, initial_state=None, mixer=None):
+    expected_qubits = n * color_bit_width(k)
+    if H.num_qubits != expected_qubits:
+        raise ValueError(
+            f"Direct Hamiltonian qubit mismatch: expected {expected_qubits}, got {H.num_qubits}. "
+            "This usually means a QUBO-derived operator was passed instead of the direct space-efficient Hamiltonian."
+        )
+
+    if initial_state is not None and initial_state.num_qubits != expected_qubits:
+        raise ValueError(
+            f"Initial state qubit mismatch: expected {expected_qubits}, got {initial_state.num_qubits}."
+        )
+
+    if mixer is not None and mixer.num_qubits != expected_qubits:
+        raise ValueError(
+            f"Mixer qubit mismatch: expected {expected_qubits}, got {mixer.num_qubits}."
+        )
+
 def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level: int, service: QiskitRuntimeService | None, simulation: bool = True):
+    algorithm_globals.random_seed = 42
     result = None
     if simulation == False:
         backend = service.least_busy(simulator=False)
@@ -588,6 +705,29 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
         result = solver.solve(qp)
     
     else:
+        qubo = QuadraticProgramToQubo().convert(qp)
+        num_qubits = len(qubo.variables)
+        expected_qubits = n * color_bit_width(k)
+        if num_qubits != expected_qubits:
+            raise ValueError(
+                f"The QUBO formulation expanded to {num_qubits} variables, but the custom initial state and mixer are "
+                f"built for the direct space-efficient encoding with {expected_qubits} qubits. "
+                "If you intended to use the direct Hamiltonian, call pauli_grouping(..., ham_repr=True)."
+            )
+        initial_point = [0.1] * (2 * reps)
+
+        if num_qubits <= 20:
+            qaoa = QAOA(
+                sampler=StatevectorSampler(),
+                optimizer=COBYLA(maxiter=200),
+                reps=reps,
+                initial_state=binary_initial_state(n, k),
+                mixer=gray_code_mixer(n, k, beta=Parameter("beta")),
+                initial_point=initial_point,
+            )
+            optimizer = MinimumEigenOptimizer(qaoa)
+            return optimizer.solve(qubo)
+
         backend_options = dict(
             method="matrix_product_state",
             max_parallel_threads=6,
@@ -595,8 +735,6 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
             matrix_product_state_truncation_threshold=1e-8,
             max_memory_mb=700000,
         )
-        
-        qubo = qubo = QuadraticProgramToQubo().convert(qp)
 
         spsa = SPSA(
             maxiter=300,
@@ -611,20 +749,60 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
                 run_options={'shots': 256},
                 backend_options=backend_options
             ),
-            optimizer=COBYLA(),
+            optimizer=spsa,
             reps=reps,
             initial_state=binary_initial_state(n, k),
-            mixer=gray_code_mixer(n, k, beta=Parameter("β")),
-            initial_point=[0.1] * (2 * reps)
-            # mixer=binary_coloring_mixer(n, k, beta=Parameter('beta')),
-            # initial_point=[0.1] * (1 * reps)
+            mixer=gray_code_mixer(n, k, beta=Parameter("beta")),
+            initial_point=initial_point,
         )
 
         optimizer = MinimumEigenOptimizer(qaoa)
         result = optimizer.solve(qubo)
     return result
 
-def run_qaoa_H(H, reps=2):
+def run_qaoa_H(H, n, k, reps=2, service: QiskitRuntimeService | None = None, optimization_level: int = 2, simulation: bool = True):
+    algorithm_globals.random_seed = 42
+    initial_point = [0.1] * (2 * reps)
+    initial_state = binary_initial_state(n, k)
+    mixer = gray_code_mixer(n, k, beta=Parameter("beta"))
+    validate_direct_qaoa_dimensions(H, n, k, initial_state=initial_state, mixer=mixer)
+    print('Number of qubits:', H.num_qubits)
+
+    if simulation == False:
+        backend = service.least_busy(simulator=False)
+        print(backend)
+
+        sampler = Sampler(mode=backend)
+        optimizer = SPSA(maxiter=100)
+        pm = generate_preset_pass_manager(
+            backend=backend,
+            optimization_level=optimization_level,
+            translation_method='translator',
+            routing_method='sabre'
+        )
+
+        qaoa = QAOA(
+            sampler=sampler,
+            optimizer=optimizer,
+            reps=reps,
+            pass_manager=pm,
+            initial_state=initial_state,
+            mixer=mixer,
+            initial_point=initial_point,
+        )
+        return qaoa.compute_minimum_eigenvalue(H)
+
+    if H.num_qubits <= 20:
+        qaoa = QAOA(
+            sampler=StatevectorSampler(),
+            optimizer=COBYLA(maxiter=200),
+            reps=reps,
+            initial_state=initial_state,
+            mixer=mixer,
+            initial_point=initial_point,
+        )
+        return qaoa.compute_minimum_eigenvalue(H)
+
     backend_options = dict(
         method="matrix_product_state",
         max_parallel_threads=6,
@@ -646,17 +824,14 @@ def run_qaoa_H(H, reps=2):
             run_options={'shots': 256},
             backend_options=backend_options
         ),
-        optimizer=COBYLA(),
+        optimizer=spsa,
         reps=reps,
-        # initial_state=binary_initial_state(n, k),
-        # mixer=binary_coloring_mixer(n, k, beta=Parameter('beta')),
-        # initial_point=[0.1] * (2 * reps)
+        initial_state=initial_state,
+        mixer=mixer,
+        initial_point=initial_point,
     )
 
-    print('Number of qubits:', H.num_qubits)
-
-    result = qaoa.compute_minimum_eigenvalue(H)
-    return result
+    return qaoa.compute_minimum_eigenvalue(H)
 
 def get_results(pauli_grouping_info: PauliGroupingInfo, job_result: dict | None = None, service: QiskitRuntimeService | None = None, job_id: str | None = None):
     if service is not None and job_id is not None:
@@ -681,22 +856,6 @@ def get_results(pauli_grouping_info: PauliGroupingInfo, job_result: dict | None 
     print('Cost:', costs[opt_sol_found])
 
     return (opt_sol_found, costs[opt_sol_found])
-
-def decode_bitstring(bitstring, n, k):
-    m = int(np.ceil(np.log2(k)))
-    colors = []
-    bitstring = bitstring[::-1] # reverse to match indexing
-
-    for v in range(n):
-        value = 0
-        for l in range(m):
-            bit = int(bitstring[v * m + l])
-            value += bit << l
-
-        colors.append(value)
-
-    return colors[::-1] # reverse back
-
 
 #########################
 # Running QAOA on a QPU #
@@ -723,11 +882,6 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
         D=D
     )
     
-    # qp = graph_colouring_qubo_qp(A_comp, k, C, D)
-
-    qp = space_efficient_qp(A_comp, num_colors=k)
-    # print(qp.prettyprint())
-
     service = None
     if simulation == False:
         service = QiskitRuntimeService(
@@ -736,10 +890,34 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
         )
     
     if ham_repr:
-        H = build_cost_hamiltonian(paulis, k)
-        result = run_qaoa_H(H, reps)
-        print(decode_bitstring(result.best_measurement['bitstring'], pauli_grouping_info.n, k))
+        H = build_cost_hamiltonian(
+            paulis,
+            k,
+            invalid_penalty=0.0,
+            conflict_penalty=D,
+        )
+        result = run_qaoa_H(
+            H,
+            pauli_grouping_info.n,
+            k,
+            reps,
+            service=service,
+            optimization_level=optimization_level,
+            simulation=simulation,
+        )
+
+        best_measurement = getattr(result, "best_measurement", None)
+        if best_measurement is not None:
+            colours, invalid_vertices = decode_bitstring(
+                best_measurement["bitstring"],
+                pauli_grouping_info.n,
+                k,
+            )
+            populate_grouping_summary(pauli_grouping_info, colours, invalid_vertices)
     else:
+        # Keep the QUBO path isolated from the direct-Hamiltonian path so the
+        # operator ansatz cannot accidentally inherit the quadratized problem size.
+        qp = space_efficient_qp(A_comp, num_colors=k)
         result = run_qaoa(qp, reps, pauli_grouping_info.n, k, optimization_level, service)
 
     return (pauli_grouping_info, result)
