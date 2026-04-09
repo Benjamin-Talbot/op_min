@@ -18,6 +18,7 @@ from dataclasses import dataclass
 import math
 import os
 from random import randint
+from types import SimpleNamespace
 import numpy as np
 
 from qiskit import transpile, QuantumCircuit
@@ -326,6 +327,22 @@ def complement_graph(A):
 def build_commutation_graph(paulis):
     return np.array(generate_qwc_graph(paulis), dtype=int)
 
+def sparse_pauli_subset(paulis: SparsePauliOp, indices: list[int]) -> SparsePauliOp:
+    return SparsePauliOp.from_list(
+        [(paulis.paulis[i].to_label(), paulis.coeffs[i]) for i in indices]
+    )
+
+def split_universally_commuting_terms(paulis: SparsePauliOp):
+    qwc_graph = generate_qwc_graph(paulis)
+    universally_commuting = [
+        index for index, row in enumerate(qwc_graph) if sum(row) == len(qwc_graph) - 1
+    ]
+    universally_commuting_set = set(universally_commuting)
+    active_indices = [
+        index for index in range(len(qwc_graph)) if index not in universally_commuting_set
+    ]
+    return qwc_graph, active_indices, universally_commuting
+
 import itertools
 import math
 
@@ -488,9 +505,15 @@ class PauliGroupingInfo:
     vertices: list[int]
     C: int
     D: int
+    active_paulis: SparsePauliOp | None = None
+    active_A: list[list[int]] | None = None
+    active_A_comp: list[list[int]] | None = None
+    active_vertices: list[int] | None = None
+    universally_commuting_vertices: list[int] | None = None
     raw_colours: list[int] | None = None
     repaired_colours: list[int] | None = None
     groups: list[list[int]] | None = None
+    groups_by_colour: list[list[int]] | None = None
     raw_conflicts: int | None = None
     repaired_conflicts: int | None = None
     invalid_vertices: list[int] | None = None
@@ -550,11 +573,14 @@ def repair_colouring(A, colours, num_colors):
     return repaired
 
 def colouring_to_groups(colours, num_colors):
+    return [group for group in colouring_to_groups_by_colour(colours, num_colors) if group]
+
+def colouring_to_groups_by_colour(colours, num_colors):
     groups = defaultdict(list)
     for vertex, colour in enumerate(colours):
         if 0 <= colour < num_colors:
             groups[colour].append(vertex)
-    return [groups[colour] for colour in range(num_colors) if groups[colour]]
+    return [groups[colour] for colour in range(num_colors)]
 
 def decode_bitstring(bitstring, n, k):
     m = color_bit_width(k)
@@ -571,19 +597,73 @@ def decode_bitstring(bitstring, n, k):
 
     return colours, invalid_vertices
 
+def decode_assignment_bits(values, n, k):
+    m = color_bit_width(k)
+    colours = []
+    invalid_vertices = []
+
+    for vertex in range(n):
+        bits = [int(round(values[vertex * m + offset])) for offset in range(m)]
+        colour = bits_to_color(bits)
+        colours.append(colour)
+        if colour >= k:
+            invalid_vertices.append(vertex)
+
+    return colours, invalid_vertices
+
 def populate_grouping_summary(pauli_grouping_info: PauliGroupingInfo, colours, invalid_vertices):
-    repaired_colours = repair_colouring(pauli_grouping_info.A_comp, colours, len(pauli_grouping_info.colours))
-    pauli_grouping_info.raw_colours = colours
+    active_vertices = pauli_grouping_info.active_vertices
+    if active_vertices is None:
+        active_vertices = pauli_grouping_info.vertices
+
+    active_A_comp = pauli_grouping_info.active_A_comp
+    if active_A_comp is None:
+        active_A_comp = pauli_grouping_info.A_comp
+
+    universally_commuting = pauli_grouping_info.universally_commuting_vertices or []
+    num_colors = len(pauli_grouping_info.colours)
+    repaired_active_colours = repair_colouring(active_A_comp, colours, num_colors)
+
+    raw_colours = [-1] * pauli_grouping_info.n
+    repaired_colours = [-1] * pauli_grouping_info.n
+
+    for local_vertex, original_vertex in enumerate(active_vertices):
+        raw_colours[original_vertex] = colours[local_vertex]
+        repaired_colours[original_vertex] = repaired_active_colours[local_vertex]
+
+    for original_vertex in universally_commuting:
+        raw_colours[original_vertex] = 0
+        repaired_colours[original_vertex] = 0
+
+    universally_commuting_set = set(universally_commuting)
+    groups_without_universal_terms = colouring_to_groups_by_colour(
+        [
+            colour if vertex not in universally_commuting_set else -1
+            for vertex, colour in enumerate(repaired_colours)
+        ],
+        num_colors,
+    )
+    if universally_commuting:
+        groups_without_universal_terms[0].extend(universally_commuting)
+
+    pauli_grouping_info.raw_colours = raw_colours
     pauli_grouping_info.repaired_colours = repaired_colours
-    pauli_grouping_info.groups = colouring_to_groups(repaired_colours, len(pauli_grouping_info.colours))
-    pauli_grouping_info.raw_conflicts = count_colour_conflicts(pauli_grouping_info.A_comp, colours, len(pauli_grouping_info.colours))
-    pauli_grouping_info.repaired_conflicts = count_colour_conflicts(pauli_grouping_info.A_comp, repaired_colours, len(pauli_grouping_info.colours))
-    pauli_grouping_info.invalid_vertices = invalid_vertices
+    pauli_grouping_info.groups_by_colour = groups_without_universal_terms
+    pauli_grouping_info.groups = [group for group in groups_without_universal_terms if group]
+    pauli_grouping_info.raw_conflicts = count_colour_conflicts(pauli_grouping_info.A_comp, raw_colours, num_colors)
+    pauli_grouping_info.repaired_conflicts = count_colour_conflicts(pauli_grouping_info.A_comp, repaired_colours, num_colors)
+    pauli_grouping_info.invalid_vertices = [active_vertices[index] for index in invalid_vertices]
 
 def print_grouping_summary(pauli_grouping_info: PauliGroupingInfo):
     if pauli_grouping_info.repaired_colours is None:
         print("No decoded grouping summary available.")
         return
+
+    if pauli_grouping_info.universally_commuting_vertices:
+        print(
+            "Universally commuting terms removed before QAOA and added back to colour 0:",
+            pauli_grouping_info.universally_commuting_vertices,
+        )
 
     print("\nDecoded colouring:")
     print(pauli_grouping_info.raw_colours)
@@ -869,8 +949,11 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
     Returns a list of lists, where each inner list contains the indices of the Pauli words that belong to the same QWC group.
     '''
 
-    A = generate_qwc_graph(paulis)
+    A, active_vertices, universally_commuting_vertices = split_universally_commuting_terms(paulis)
     A_comp = complement_graph(A)
+    active_paulis = sparse_pauli_subset(paulis, active_vertices) if active_vertices else None
+    active_A = [[A[i][j] for j in active_vertices] for i in active_vertices]
+    active_A_comp = complement_graph(active_A)
 
     pauli_grouping_info = PauliGroupingInfo(
         paulis=paulis,
@@ -881,7 +964,12 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
         colours=[i for i in range(k)],
         vertices=[v for v in range(len(A))],
         C=C,
-        D=D
+        D=D,
+        active_paulis=active_paulis,
+        active_A=active_A,
+        active_A_comp=active_A_comp,
+        active_vertices=active_vertices,
+        universally_commuting_vertices=universally_commuting_vertices,
     )
     
     service = None
@@ -890,17 +978,36 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
             channel="ibm_quantum_platform",
             token=api_key
         )
+
+    if not active_vertices:
+        populate_grouping_summary(pauli_grouping_info, [], [])
+        if ham_repr:
+            return (
+                pauli_grouping_info,
+                SimpleNamespace(
+                    best_measurement={"bitstring": "", "value": 0.0},
+                    cost_function_evals=0,
+                ),
+            )
+        return (
+            pauli_grouping_info,
+            SimpleNamespace(
+                samples=[],
+                x=[],
+                prettyprint=lambda: "All Pauli terms commute with one another; no QAOA run was required.",
+            ),
+        )
     
     if ham_repr:
         H = build_cost_hamiltonian(
-            paulis,
+            active_paulis,
             k,
             invalid_penalty=0.0,
             conflict_penalty=D,
         )
         result = run_qaoa_H(
             H,
-            pauli_grouping_info.n,
+            len(active_vertices),
             k,
             reps,
             service=service,
@@ -912,15 +1019,23 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
         if best_measurement is not None:
             colours, invalid_vertices = decode_bitstring(
                 best_measurement["bitstring"],
-                pauli_grouping_info.n,
+                len(active_vertices),
                 k,
             )
             populate_grouping_summary(pauli_grouping_info, colours, invalid_vertices)
     else:
         # Keep the QUBO path isolated from the direct-Hamiltonian path so the
         # operator ansatz cannot accidentally inherit the quadratized problem size.
-        qp = space_efficient_qp(A_comp, num_colors=k)
-        result = run_qaoa(qp, reps, pauli_grouping_info.n, k, optimization_level, service)
+        qp = space_efficient_qp(active_A_comp, num_colors=k)
+        result = run_qaoa(qp, reps, len(active_vertices), k, optimization_level, service)
+        assignment = getattr(result, "x", None)
+        if assignment is not None:
+            colours, invalid_vertices = decode_assignment_bits(
+                assignment,
+                len(active_vertices),
+                k,
+            )
+            populate_grouping_summary(pauli_grouping_info, colours, invalid_vertices)
 
     return (pauli_grouping_info, result)
     
