@@ -1,9 +1,10 @@
 api_key = ''
 # hamiltonians_path = '/home/btalbot/projects/def-stijn/btalbot/op_min/hamiltonians/' # Siku
-hamiltonians_path = '/home/btalbot/links/projects/def-stijn/btalbot/op_min/hamiltonians/' # Trillium
-# hamiltonians_path = './hamiltonians/'
+# hamiltonians_path = '/home/btalbot/links/projects/def-stijn/btalbot/op_min/hamiltonians/' # Trillium
+# hamiltonians_path = '/home/btalbot/scratch/honours_code/one-hot-encoding/hamiltonians/' # Fir
+hamiltonians_path = './hamiltonians/'
 
-simulation = True
+simulation = False
 
 ####################################
 # Function and Problem Definitions #
@@ -452,7 +453,10 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
     qubo = QuadraticProgramToQubo().convert(qp)
     result = None
     if simulation == False:
-        backend = service.least_busy(simulator=False)
+        if service is None:
+            raise ValueError("A QiskitRuntimeService instance is required when simulation=False.")
+
+        backend = service.least_busy(simulator=False, operational=True, min_num_qubits=n * k)
         print(backend)
 
         sampler = Sampler(mode=backend)
@@ -470,6 +474,8 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
             sampler=sampler,
             optimizer=optimizer,
             reps=reps,
+            initial_state=initial_state(n, k),
+            mixer=xy_mixer(n, k, beta=0.5),
             pass_manager=pm
         )
 
@@ -482,10 +488,10 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
     else:
         backend_options = dict(
             method="matrix_product_state",
-            max_parallel_threads=6,
+            max_parallel_threads=64,
             matrix_product_state_max_bond_dimension=32,
             matrix_product_state_truncation_threshold=1e-8,
-            max_memory_mb=700000,
+            max_memory_mb=0,
         )
         
         qaoa = QAOA(
@@ -585,7 +591,7 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
         )
 
     qp = graph_colouring_qubo_qp(active_A_comp, k, C, D)
-    result, qubo = run_qaoa(qp, reps, len(active_vertices), k, optimization_level, service)
+    result, qubo = run_qaoa(qp, reps, len(active_vertices), k, optimization_level, service, simulation=simulation)
 
     postprocessed = postprocess_one_hot_result(
         result,
