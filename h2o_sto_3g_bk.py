@@ -7,7 +7,7 @@ with open(hamiltonians_path + h2o_name + '.txt', 'r') as f:
 
 paulis = SparsePauliOp.from_list([(t, 1.0) for t in h2o_hamiltonian])
 k = 308
-pauli_grouping_info, result = pauli_grouping(paulis, C, D, k, reps, optimization_level, api_key)
+pauli_grouping_info, result = pauli_grouping(paulis, C, D, k, reps, optimization_level, api_key, simulation=simulation)
 
 print(result)
 print()

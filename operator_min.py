@@ -4,7 +4,12 @@ api_key = ''
 # hamiltonians_path = '/home/btalbot/scratch/honours_code/one-hot-encoding/hamiltonians/' # Fir
 hamiltonians_path = './hamiltonians/'
 
-simulation = False
+simulation = True
+# Set to False to keep fully commuting terms in the QAOA optimization problem.
+remove_fully_commuting_terms = True
+print_qaoa_circuit_diagram = False
+save_qaoa_circuit_diagram = True
+qaoa_circuit_output_dir = "results/qaoa_circuit_diagrams"
 
 ####################################
 # Function and Problem Definitions #
@@ -14,12 +19,16 @@ simulation = False
 
 from itertools import combinations
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from random import randint
 from types import SimpleNamespace
+import numpy as np
 
 from qiskit import transpile, QuantumCircuit
-from qiskit.circuit.library import XXPlusYYGate
+from qiskit.circuit import Parameter
+from qiskit.circuit.library import QAOAAnsatz, XXPlusYYGate
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
@@ -267,6 +276,10 @@ class PauliGroupingInfo:
     raw_conflicts: int | None = None
     repaired_conflicts: int | None = None
     invalid_vertices: list[int] | None = None
+    best_bitstring: str | None = None
+    best_measurement_weight: float | None = None
+    qubo_objective: float | None = None
+    result_source: str | None = None
 
 def count_colour_conflicts(A, colours, num_colors):
     conflicts = 0
@@ -425,6 +438,195 @@ def postprocess_one_hot_result(
 
     return best_summary[1] if best_summary is not None else None
 
+def bitstring_to_vector(bitstring: str, num_variables: int):
+    clean = bitstring.replace(" ", "")
+    if len(clean) != num_variables:
+        raise ValueError(
+            f"Expected a {num_variables}-bit string, but received {len(clean)} bits: {bitstring!r}"
+        )
+
+    # Qiskit count strings are displayed with qubit 0 on the right.
+    return [int(bit) for bit in reversed(clean)]
+
+def normalize_measurement_map(measurements, num_variables: int):
+    if measurements is None:
+        return None
+
+    if hasattr(measurements, "binary_probabilities"):
+        try:
+            measurements = measurements.binary_probabilities(num_variables)
+        except TypeError:
+            measurements = measurements.binary_probabilities()
+
+    if not isinstance(measurements, Mapping):
+        return None
+
+    if "bitstring" in measurements and isinstance(measurements["bitstring"], str):
+        weight = measurements.get("probability", measurements.get("count", 1))
+        return {measurements["bitstring"].replace(" ", ""): weight}
+
+    normalized = {}
+    for key, value in measurements.items():
+        if isinstance(key, str):
+            bitstring = key.replace(" ", "")
+        elif isinstance(key, int):
+            bitstring = format(key, f"0{num_variables}b")
+        else:
+            continue
+
+        if len(bitstring) != num_variables:
+            continue
+
+        normalized[bitstring] = value
+
+    return normalized or None
+
+def extract_measurement_map(payload, num_variables: int, _visited=None):
+    if payload is None:
+        return None
+
+    if _visited is None:
+        _visited = set()
+
+    payload_id = id(payload)
+    if payload_id in _visited:
+        return None
+    _visited.add(payload_id)
+
+    normalized = normalize_measurement_map(payload, num_variables)
+    if normalized is not None:
+        return normalized
+
+    if hasattr(payload, "get_counts"):
+        try:
+            normalized = normalize_measurement_map(payload.get_counts(), num_variables)
+        except TypeError:
+            normalized = None
+        if normalized is not None:
+            return normalized
+
+    if hasattr(payload, "data"):
+        data = getattr(payload, "data")
+        for attribute in ("meas", "c", "bits"):
+            register = getattr(data, attribute, None)
+            normalized = extract_measurement_map(register, num_variables, _visited)
+            if normalized is not None:
+                return normalized
+
+    if hasattr(payload, "min_eigen_solver_result"):
+        min_eigen_solver_result = getattr(payload, "min_eigen_solver_result")
+        for attribute in ("eigenstate", "best_measurement", "quasi_distribution"):
+            normalized = extract_measurement_map(
+                getattr(min_eigen_solver_result, attribute, None),
+                num_variables,
+                _visited,
+            )
+            if normalized is not None:
+                return normalized
+
+    if isinstance(payload, (list, tuple)):
+        for item in payload:
+            normalized = extract_measurement_map(item, num_variables, _visited)
+            if normalized is not None:
+                return normalized
+        return None
+
+    try:
+        first_item = payload[0]
+    except Exception:
+        return None
+    return extract_measurement_map(first_item, num_variables, _visited)
+
+def decode_measurement_results(measurement_map, qubo: QuadraticProgram, pauli_grouping_info: PauliGroupingInfo):
+    best_summary = None
+
+    for bitstring, weight in measurement_map.items():
+        vector = bitstring_to_vector(bitstring, len(qubo.variables))
+        result_like = SimpleNamespace(x=vector, samples=[SimpleNamespace(x=vector)])
+        summary = postprocess_one_hot_result(
+            result_like,
+            qubo,
+            pauli_grouping_info.A_comp,
+            pauli_grouping_info.active_A_comp,
+            pauli_grouping_info.active_vertices,
+            pauli_grouping_info.fully_commuting_vertices,
+            len(pauli_grouping_info.colours),
+        )
+        if summary is None:
+            continue
+
+        summary["best_bitstring"] = bitstring
+        summary["best_measurement_weight"] = float(weight)
+        summary["qubo_objective"] = qubo.objective.evaluate(vector)
+        rank = (
+            summary["repaired_conflicts"],
+            len(summary["invalid_vertices"]),
+            summary["raw_conflicts"],
+            summary["qubo_objective"],
+            -summary["best_measurement_weight"],
+        )
+        if best_summary is None or rank < best_summary[0]:
+            best_summary = (rank, summary)
+
+    return best_summary[1] if best_summary is not None else None
+
+def apply_postprocessed_summary(pauli_grouping_info: PauliGroupingInfo, summary, source: str):
+    if summary is None:
+        return
+
+    pauli_grouping_info.raw_colours = summary["raw_colours"]
+    pauli_grouping_info.repaired_colours = summary["repaired_colours"]
+    pauli_grouping_info.groups_by_colour = summary["groups_by_colour"]
+    pauli_grouping_info.groups = summary["groups"]
+    pauli_grouping_info.raw_conflicts = summary["raw_conflicts"]
+    pauli_grouping_info.repaired_conflicts = summary["repaired_conflicts"]
+    pauli_grouping_info.invalid_vertices = summary["invalid_vertices"]
+    pauli_grouping_info.best_bitstring = summary.get("best_bitstring")
+    pauli_grouping_info.best_measurement_weight = summary.get("best_measurement_weight")
+    pauli_grouping_info.qubo_objective = summary.get("qubo_objective")
+    pauli_grouping_info.result_source = source
+
+def resolve_remove_fully_commuting_terms(remove_fully_commuting_terms_enabled: bool | None = None):
+    if remove_fully_commuting_terms_enabled is None:
+        return remove_fully_commuting_terms
+    return remove_fully_commuting_terms_enabled
+
+def prepare_grouping_problem(
+    paulis: SparsePauliOp,
+    k: int,
+    C: int,
+    D: int,
+    simulation: bool,
+    remove_fully_commuting_terms_enabled: bool | None = None,
+):
+    if resolve_remove_fully_commuting_terms(remove_fully_commuting_terms_enabled):
+        A, active_vertices, fully_commuting_vertices = split_fully_commuting_terms(paulis)
+    else:
+        A = generate_qwc_graph(paulis)
+        active_vertices = [index for index in range(len(A))]
+        fully_commuting_vertices = []
+
+    A_comp = complement_graph(A)
+    active_A_comp = complement_graph(subgraph_from_indices(A, active_vertices))
+
+    pauli_grouping_info = PauliGroupingInfo(
+        paulis=paulis,
+        A=A,
+        A_comp=A_comp,
+        n=len(A),
+        degrees=[sum(row) for row in A_comp],
+        colours=[i for i in range(k)],
+        vertices=[v for v in range(len(A))],
+        C=C,
+        D=D,
+        active_vertices=active_vertices,
+        active_A_comp=active_A_comp,
+        fully_commuting_vertices=fully_commuting_vertices,
+    )
+
+    qp = graph_colouring_qubo_qp(active_A_comp, k, C, D)
+    return pauli_grouping_info, qp
+
 def xy_mixer(n, k, beta):
     n_qubits = n * k
     qc = QuantumCircuit(n_qubits)
@@ -448,10 +650,74 @@ def initial_state(n: int, k: int):
     
     return qc
 
+def build_qaoa_components(n: int, k: int, reps: int):
+    mixer_parameter = Parameter("beta")
+    mixer_circuit = xy_mixer(n, k, beta=mixer_parameter)
+
+    # Avoid SPSA auto-calibration, which can produce NaNs when the initial
+    # gradient estimate is numerically flat on small/noisy instances.
+    optimizer = SPSA(
+        maxiter=100,
+        learning_rate=0.05,
+        perturbation=0.05,
+        trust_region=True,
+    )
+    initial_point = np.array([0.1] * (2 * reps), dtype=float)
+
+    return optimizer, mixer_circuit, initial_point
+
+def export_qaoa_circuit_diagram(
+    qubo: QuadraticProgram,
+    reps: int,
+    initial_state_circuit: QuantumCircuit,
+    mixer_circuit: QuantumCircuit,
+    output_dir: Path | str = qaoa_circuit_output_dir,
+    print_diagram: bool = print_qaoa_circuit_diagram,
+    save_diagram: bool = save_qaoa_circuit_diagram,
+    transpiled_circuit: QuantumCircuit | None = None,
+):
+    if not print_diagram and not save_diagram:
+        return None
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    cost_operator, _ = qubo.to_ising()
+    circuit = QAOAAnsatz(
+        cost_operator=cost_operator,
+        reps=reps,
+        initial_state=initial_state_circuit,
+        mixer_operator=mixer_circuit,
+    ).decompose(reps=10)
+
+    saved_paths = []
+
+    if save_diagram:
+        logical_path = output_dir / f"{qubo.name}_qaoa_reps_{reps}_logical.png"
+        circuit.draw(output="mpl", filename=str(logical_path), fold=-1)
+        saved_paths.append(logical_path)
+
+        if print_diagram:
+            print(f"Saved logical QAOA circuit diagram to {logical_path.resolve()}")
+
+        if transpiled_circuit is not None:
+            transpiled_path = output_dir / f"{qubo.name}_qaoa_reps_{reps}_transpiled.png"
+            transpiled_circuit.draw(output="mpl", filename=str(transpiled_path), fold=-1)
+            saved_paths.append(transpiled_path)
+
+    if saved_paths:
+        print("Saved QAOA circuit diagram(s):")
+        for path in saved_paths:
+            print(path.resolve())
+
+    return circuit
+
 def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level: int, service: QiskitRuntimeService | None, simulation: bool = True):
     algorithm_globals.random_seed = 42
     qubo = QuadraticProgramToQubo().convert(qp)
     result = None
+    optimizer, mixer_circuit, initial_point = build_qaoa_components(n, k, reps)
+    initial_state_circuit = initial_state(n, k)
     if simulation == False:
         if service is None:
             raise ValueError("A QiskitRuntimeService instance is required when simulation=False.")
@@ -460,8 +726,6 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
         print(backend)
 
         sampler = Sampler(mode=backend)
-        optimizer = SPSA(maxiter=100)
-        # optimizer = COBYLA()
 
         # Build the hybrid QAOA solver
         pm = generate_preset_pass_manager(
@@ -470,12 +734,28 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
             translation_method='translator',
             routing_method='sabre'
         )
+        transpiled_preview = pm.run(
+            QAOAAnsatz(
+                cost_operator=qubo.to_ising()[0],
+                reps=reps,
+                initial_state=initial_state_circuit,
+                mixer_operator=mixer_circuit,
+            )
+        )
+        export_qaoa_circuit_diagram(
+            qubo,
+            reps,
+            initial_state_circuit,
+            mixer_circuit,
+            transpiled_circuit=transpiled_preview,
+        )
         qaoa = QAOA(
             sampler=sampler,
             optimizer=optimizer,
             reps=reps,
-            initial_state=initial_state(n, k),
-            mixer=xy_mixer(n, k, beta=0.5),
+            initial_state=initial_state_circuit,
+            mixer=mixer_circuit,
+            initial_point=initial_point,
             pass_manager=pm
         )
 
@@ -499,10 +779,17 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
                 run_options={'shots': 256},
                 backend_options=backend_options
             ),
-            optimizer=SPSA(),
+            optimizer=optimizer,
             reps=reps,
-            initial_state=initial_state(n, k),
-            mixer=xy_mixer(n, k, beta=0.5)
+            initial_state=initial_state_circuit,
+            mixer=mixer_circuit,
+            initial_point=initial_point,
+        )
+        export_qaoa_circuit_diagram(
+            qubo,
+            reps,
+            initial_state_circuit,
+            mixer_circuit,
         )
 
         optimizer = MinimumEigenOptimizer(qaoa)
@@ -517,70 +804,71 @@ def get_results(pauli_grouping_info: PauliGroupingInfo, job_result: dict | None 
     if job_result is None:
         raise ValueError("Either job_result or both service and job_id must be provided.")
 
-    counts = job_result[0].data.meas.get_counts()
-    highest_counts = get_modes(counts)
+    qp = graph_colouring_qubo_qp(
+        pauli_grouping_info.active_A_comp,
+        len(pauli_grouping_info.colours),
+        pauli_grouping_info.C,
+        pauli_grouping_info.D,
+    )
+    qubo = QuadraticProgramToQubo().convert(qp)
 
-    costs = {}
-    for count in highest_counts:
-        # print('Bitstring:', count)
-        cost_val = cost(count, pauli_grouping_info.A, pauli_grouping_info.vertices, pauli_grouping_info.colours, pauli_grouping_info.degrees, pauli_grouping_info.C, pauli_grouping_info.D)
-        costs[count] = cost_val
-        # print('Cost:', cost_val)
+    measurement_map = extract_measurement_map(job_result, len(qubo.variables))
+    if measurement_map is None:
+        raise TypeError("Could not extract measurement counts or probabilities from the IBM result object.")
 
-    opt_sol_found = get_smallest_cost(costs)
-    print('Optimal solution found:', opt_sol_found)
-    print('Cost:', costs[opt_sol_found])
+    postprocessed = decode_measurement_results(measurement_map, qubo, pauli_grouping_info)
+    if postprocessed is None:
+        raise ValueError("Unable to decode the IBM result into a one-hot colouring.")
 
-    return (opt_sol_found, costs[opt_sol_found])
+    apply_postprocessed_summary(pauli_grouping_info, postprocessed, source="ibm_measurements")
+
+    print('Best measured bitstring:', pauli_grouping_info.best_bitstring)
+    print('Measurement weight:', pauli_grouping_info.best_measurement_weight)
+    print('QUBO objective:', pauli_grouping_info.qubo_objective)
+
+    return (pauli_grouping_info.best_bitstring, pauli_grouping_info.qubo_objective)
 
 
 #########################
 # Running QAOA on a QPU #
 #########################
 
-def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, optimization_level: int, api_key: str, simulation: bool = True):
+def pauli_grouping(
+    paulis: SparsePauliOp,
+    C: int,
+    D: int,
+    k: int,
+    reps: int,
+    optimization_level: int,
+    api_key: str,
+    simulation: bool = True,
+    remove_fully_commuting_terms_enabled: bool | None = None,
+):
     '''
     Group the Pauli words in a SparsePauliOp object into QWC groups.
     Returns a list of lists, where each inner list contains the indices of the Pauli words that belong to the same QWC group.
     '''
-
-    A, active_vertices, fully_commuting_vertices = split_fully_commuting_terms(paulis)
-    A_comp = complement_graph(A)
-    active_A_comp = complement_graph(subgraph_from_indices(A, active_vertices))
-
-    pauli_grouping_info = PauliGroupingInfo(
-        paulis=paulis,
-        A=A,
-        A_comp=A_comp,
-        n=len(A),
-        degrees=[sum(row) for row in A_comp],
-        colours=[i for i in range(k)],
-        vertices=[v for v in range(len(A))],
-        C=C,
-        D=D,
-        active_vertices=active_vertices,
-        active_A_comp=active_A_comp,
-        fully_commuting_vertices=fully_commuting_vertices,
+    pauli_grouping_info, qp = prepare_grouping_problem(
+        paulis,
+        k,
+        C,
+        D,
+        simulation,
+        remove_fully_commuting_terms_enabled=remove_fully_commuting_terms_enabled,
     )
 
-    service = None
-    if simulation == False:
-        service = QiskitRuntimeService(
-            channel="ibm_quantum_platform",
-            token=api_key
-        )
-
-    if not active_vertices:
+    if not pauli_grouping_info.active_vertices:
         groups_by_colour = [[] for _ in range(k)]
         if k > 0:
-            groups_by_colour[0] = list(fully_commuting_vertices)
-        pauli_grouping_info.raw_colours = [0] * len(A)
-        pauli_grouping_info.repaired_colours = [0] * len(A)
+            groups_by_colour[0] = list(pauli_grouping_info.fully_commuting_vertices)
+        pauli_grouping_info.raw_colours = [0] * pauli_grouping_info.n
+        pauli_grouping_info.repaired_colours = [0] * pauli_grouping_info.n
         pauli_grouping_info.groups_by_colour = groups_by_colour
         pauli_grouping_info.groups = [group for group in groups_by_colour if group]
         pauli_grouping_info.raw_conflicts = 0
         pauli_grouping_info.repaired_conflicts = 0
         pauli_grouping_info.invalid_vertices = []
+        pauli_grouping_info.result_source = "shortcut"
         return (
             pauli_grouping_info,
             SimpleNamespace(
@@ -590,26 +878,38 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
             ),
         )
 
-    qp = graph_colouring_qubo_qp(active_A_comp, k, C, D)
-    result, qubo = run_qaoa(qp, reps, len(active_vertices), k, optimization_level, service, simulation=simulation)
+    service = None
+    if simulation == False:
+        service_kwargs = {"channel": "ibm_quantum_platform"}
+        if api_key:
+            service_kwargs["token"] = api_key
+        service = QiskitRuntimeService(**service_kwargs)
 
-    postprocessed = postprocess_one_hot_result(
-        result,
-        qubo,
-        A_comp,
-        active_A_comp,
-        active_vertices,
-        fully_commuting_vertices,
+    result, qubo = run_qaoa(
+        qp,
+        reps,
+        len(pauli_grouping_info.active_vertices),
         k,
+        optimization_level,
+        service,
+        simulation=simulation,
     )
-    if postprocessed is not None:
-        pauli_grouping_info.raw_colours = postprocessed["raw_colours"]
-        pauli_grouping_info.repaired_colours = postprocessed["repaired_colours"]
-        pauli_grouping_info.groups_by_colour = postprocessed["groups_by_colour"]
-        pauli_grouping_info.groups = postprocessed["groups"]
-        pauli_grouping_info.raw_conflicts = postprocessed["raw_conflicts"]
-        pauli_grouping_info.repaired_conflicts = postprocessed["repaired_conflicts"]
-        pauli_grouping_info.invalid_vertices = postprocessed["invalid_vertices"]
+
+    measurement_map = extract_measurement_map(result, len(qubo.variables))
+    if measurement_map is not None:
+        postprocessed = decode_measurement_results(measurement_map, qubo, pauli_grouping_info)
+        apply_postprocessed_summary(pauli_grouping_info, postprocessed, source="ibm_measurements" if simulation == False else "measurements")
+    else:
+        postprocessed = postprocess_one_hot_result(
+            result,
+            qubo,
+            pauli_grouping_info.A_comp,
+            pauli_grouping_info.active_A_comp,
+            pauli_grouping_info.active_vertices,
+            pauli_grouping_info.fully_commuting_vertices,
+            k,
+        )
+        apply_postprocessed_summary(pauli_grouping_info, postprocessed, source="optimizer_samples")
 
     return (pauli_grouping_info, result)
     

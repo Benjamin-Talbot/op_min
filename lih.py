@@ -1,12 +1,12 @@
 from operator_min import *
 
-beh2_name = 'BeH2_JW'
+lih_name = 'LiH'
 
-with open(hamiltonians_path + beh2_name + '.txt', 'r') as f:
-    beh2_hamiltonian = read_hamiltonian_from_file(beh2_name)
+with open(hamiltonians_path + lih_name + '.txt', 'r') as f:
+    lih_hamiltonian = read_hamiltonian_from_file(lih_name)
 
-paulis = SparsePauliOp.from_list([(t, 1.0) for t in beh2_hamiltonian])
-k = 203
+paulis = SparsePauliOp.from_list([(t, 1.0) for t in lih_hamiltonian])
+k = 25
 pauli_grouping_info, result = pauli_grouping(paulis, C, D, k, reps, optimization_level, api_key, simulation=simulation)
 
 print(result)

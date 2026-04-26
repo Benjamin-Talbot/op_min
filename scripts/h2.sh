@@ -5,27 +5,26 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=192
 #SBATCH --mem=0
-#SBATCH --time=00:20:00
-#SBATCH --partition=compute
+#SBATCH --time=08:00:00
 #SBATCH --output=/scratch/btalbot/jobs/job_%j.out
 #SBATCH --error=/scratch/btalbot/jobs/job_%j.err
 
 # Move to scratch (recommended)
-cd $SCRATCH
+cd /home/btalbot/scratch
 
 # Load environment
 module load StdEnv/2023
 module load python/3.11
 
 # Activate venv
-source /scratch/btalbot/~envs/qenv/bin/activate
+source /home/btalbot/scratch/envs/qubo/bin/activate
 
 # Threading
-export OMP_NUM_THREADS=6
+export OMP_NUM_THREADS=16
 export OMP_PROC_BIND=spread
 export OMP_PLACES=cores
 export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 
 # Run
-python ~/links/projects/def-stijn/btalbot/op_min/h2.py
+python /home/btalbot/scratch/honours_code/one-hot-encoding/h2.py

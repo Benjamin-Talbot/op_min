@@ -4,10 +4,10 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=192
-#SBATCH --mem=5900G
-#SBATCH --time=72:00:00
-#SBATCH --output=/scratch/btalbot/jobs/h2o/job_%j.out
-#SBATCH --error=/scratch/btalbot/jobs/h2o/job_%j.err
+#SBATCH --mem=0
+#SBATCH --time=36:00:00
+#SBATCH --output=/scratch/btalbot/jobs/lih/job_%j.out
+#SBATCH --error=/scratch/btalbot/jobs/lih/job_%j.err
 
 # Move to scratch (recommended)
 cd /home/btalbot/scratch
@@ -27,4 +27,4 @@ export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 
 # Run
-python /home/btalbot/scratch/honours_code/one-hot-encoding/h2o.py
+python /home/btalbot/scratch/honours_code/one-hot-encoding/lih.py

@@ -1,12 +1,12 @@
 from operator_min import *
 
-beh2_name = 'BeH2_JW'
+h2o_name = 'H2O'
 
-with open(hamiltonians_path + beh2_name + '.txt', 'r') as f:
-    beh2_hamiltonian = read_hamiltonian_from_file(beh2_name)
+with open(hamiltonians_path + h2o_name + '.txt', 'r') as f:
+    h2o_hamiltonian = read_hamiltonian_from_file(h2o_name)
 
-paulis = SparsePauliOp.from_list([(t, 1.0) for t in beh2_hamiltonian])
-k = 203
+paulis = SparsePauliOp.from_list([(t, 1.0) for t in h2o_hamiltonian])
+k = 34
 pauli_grouping_info, result = pauli_grouping(paulis, C, D, k, reps, optimization_level, api_key, simulation=simulation)
 
 print(result)

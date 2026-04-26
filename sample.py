@@ -14,7 +14,7 @@ paulis_list = [
 paulis = SparsePauliOp.from_list([(p, 1.0) for p in paulis_list])
 
 k = 2
-pauli_grouping_info, result = pauli_grouping(paulis, C, D, k, reps, optimization_level, api_key)
+pauli_grouping_info, result = pauli_grouping(paulis, C, D, k, reps, optimization_level, api_key, simulation=simulation)
 
 print(result)
 print("Number of samples:", len(result.samples))
