@@ -1,14 +1,14 @@
 from operator_min import *
 
-h2_name = 'H2_BK'
+lih_name = 'LiH'
 
-with open(hamiltonians_path + h2_name + '.txt', 'r') as f:
-    h2_hamiltonian = read_hamiltonian_from_file(h2_name)
+with open(hamiltonians_path + lih_name + '.txt', 'r') as f:
+    lih_hamiltonian = read_hamiltonian_from_file(lih_name)
 
-paulis = SparsePauliOp.from_list([(t, 1.0) for t in h2_hamiltonian])
-k = 3
+paulis = SparsePauliOp.from_list([(t, 1.0) for t in lih_hamiltonian])
+k = 25
 ham_repr = True
-pauli_grouping_info, result = pauli_grouping(paulis, C, D, k, reps, optimization_level, api_key, simulation=simulation, ham_repr=ham_repr)
+pauli_grouping_info, result = pauli_grouping(paulis, C, D, k, reps, optimization_level, api_key, ham_repr=ham_repr)
 
 if ham_repr:
     print('Result:', result.best_measurement['bitstring'])

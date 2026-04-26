@@ -1,10 +1,13 @@
 api_key = ''
 # hamiltonians_path = '/home/btalbot/projects/def-stijn/btalbot/op_min/hamiltonians/' # Siku
 # hamiltonians_path = '/home/btalbot/links/projects/def-stijn/btalbot/op_min/hamiltonians/' # Trillium
-hamiltonians_path = '/home/btalbot/scratch/op_min/hamiltonians/' # Nibi
-# hamiltonians_path = './hamiltonians/' # local
+# hamiltonians_path = '/home/btalbot/scratch/op_min/hamiltonians/' # Nibi
+# hamiltonians_path = '/home/btalbot/scratch/honours_code/no-qubo/hamiltonians/' # Fir
+hamiltonians_path = './hamiltonians/' # local
 
 simulation = True
+# Set to False to keep fully commuting terms in the QAOA optimization problem.
+remove_fully_commuting_terms = True
 
 ####################################
 # Function and Problem Definitions #
@@ -16,14 +19,14 @@ from itertools import combinations, product
 from collections import defaultdict
 from dataclasses import dataclass
 import math
-import os
+from pathlib import Path
 from random import randint
 from types import SimpleNamespace
 import numpy as np
 
 from qiskit import transpile, QuantumCircuit
 from qiskit.circuit import Parameter
-from qiskit.circuit.library import XXPlusYYGate
+from qiskit.circuit.library import QAOAAnsatz, XXPlusYYGate
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
@@ -38,6 +41,9 @@ from qiskit_optimization.utils import algorithm_globals
 from qiskit_aer import AerSimulator
 from qiskit_aer.primitives import Sampler as AerSampler
 
+QAOA_SAVE_CIRCUIT = True
+QAOA_PRINT_CIRCUIT = False
+QAOA_CIRCUIT_OUTPUT_DIR = Path("results/circuits")
 
 # Graph colouring Qubo Quadratic Program
 
@@ -323,6 +329,9 @@ def complement_graph(A):
                 A_comp[i][j] = 1 - A[i][j]
     
     return A_comp
+
+def subgraph_from_indices(A, indices):
+    return [[A[i][j] for j in indices] for i in indices]
 
 def build_commutation_graph(paulis):
     return np.array(generate_qwc_graph(paulis), dtype=int)
@@ -755,16 +764,119 @@ def validate_direct_qaoa_dimensions(H, n, k, initial_state=None, mixer=None):
             f"Mixer qubit mismatch: expected {expected_qubits}, got {mixer.num_qubits}."
         )
 
+def resolve_remove_fully_commuting_terms(remove_fully_commuting_terms_enabled: bool | None = None):
+    if remove_fully_commuting_terms_enabled is None:
+        return remove_fully_commuting_terms
+    return remove_fully_commuting_terms_enabled
+
+def build_binary_qaoa_components(n: int, k: int, reps: int, spsa_maxiter: int = 100):
+    optimizer = SPSA(
+        maxiter=spsa_maxiter,
+        learning_rate=0.05,
+        perturbation=0.05,
+        trust_region=True,
+    )
+    initial_state = binary_initial_state(n, k)
+    mixer = gray_code_mixer(n, k, beta=Parameter("beta"))
+    initial_point = np.array([0.1] * (2 * reps), dtype=float)
+    return optimizer, initial_state, mixer, initial_point
+
+def build_qaoa_export_circuit(
+    cost_operator,
+    reps: int,
+    initial_state: QuantumCircuit | None,
+    mixer: QuantumCircuit | None,
+    initial_point=None,
+):
+    circuit = QAOAAnsatz(
+        cost_operator=cost_operator,
+        reps=reps,
+        initial_state=initial_state,
+        mixer_operator=mixer,
+        flatten=True,
+    ).decompose()
+
+    if initial_point is not None:
+        parameters = list(circuit.parameters)
+        if len(parameters) == len(initial_point):
+            circuit = circuit.assign_parameters(
+                {parameter: value for parameter, value in zip(parameters, initial_point)},
+                inplace=False,
+            )
+
+    return circuit
+
+def maybe_export_qaoa_circuit(
+    *,
+    cost_operator,
+    reps: int,
+    initial_state: QuantumCircuit | None,
+    mixer: QuantumCircuit | None,
+    initial_point=None,
+    label: str,
+    pass_manager=None,
+):
+    if not QAOA_SAVE_CIRCUIT and not QAOA_PRINT_CIRCUIT:
+        return
+
+    circuit = build_qaoa_export_circuit(
+        cost_operator=cost_operator,
+        reps=reps,
+        initial_state=initial_state,
+        mixer=mixer,
+        initial_point=initial_point,
+    )
+
+    output_dir = Path(QAOA_CIRCUIT_OUTPUT_DIR)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if QAOA_PRINT_CIRCUIT:
+        text_diagram = str(circuit.draw(output="text", fold=-1, idle_wires=False))
+        print(text_diagram)
+    try:
+        image_path = output_dir / f"{label}.png"
+        circuit.draw(output="mpl", filename=str(image_path), fold=-1, idle_wires=False)
+        print(f"Saved QAOA circuit image to {image_path.resolve()}")
+    except Exception as exc:
+        print(f"Could not save QAOA circuit PNG for {label}: {exc}")
+
+    if pass_manager is not None:
+        try:
+            transpiled_circuit = pass_manager.run(circuit)
+            transpiled_image_path = output_dir / f"{label}_transpiled.png"
+            transpiled_circuit.draw(
+                output="mpl",
+                filename=str(transpiled_image_path),
+                fold=-1,
+                idle_wires=False,
+            )
+            print(f"Saved transpiled QAOA circuit image to {transpiled_image_path.resolve()}")
+        except Exception as exc:
+            print(f"Could not save transpiled QAOA circuit image for {label}: {exc}")
+
 def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level: int, service: QiskitRuntimeService | None, simulation: bool = True):
     algorithm_globals.random_seed = 42
-    result = None
+    qubo = QuadraticProgramToQubo().convert(qp)
+    cost_operator, _ = qubo.to_ising()
+    num_qubits = len(qubo.variables)
+    expected_qubits = n * color_bit_width(k)
+    if num_qubits != expected_qubits:
+        raise ValueError(
+            f"The QUBO formulation expanded to {num_qubits} variables, but the custom initial state and mixer are "
+            f"built for the direct space-efficient encoding with {expected_qubits} qubits. "
+            "If you intended to use the direct Hamiltonian, call pauli_grouping(..., ham_repr=True)."
+        )
+
+    optimizer, initial_state, mixer, initial_point = build_binary_qaoa_components(n, k, reps)
+
     if simulation == False:
-        backend = service.least_busy(simulator=False)
+        if service is None:
+            raise ValueError("A QiskitRuntimeService instance is required when simulation=False.")
+
+        backend = service.least_busy(simulator=False, operational=True, min_num_qubits=num_qubits)
         print(backend)
 
         sampler = Sampler(mode=backend)
-        optimizer = SPSA(maxiter=100)
-        # optimizer = COBYLA()
 
         # Build the hybrid QAOA solver
         pm = generate_preset_pass_manager(
@@ -777,45 +889,54 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
             sampler=sampler,
             optimizer=optimizer,
             reps=reps,
+            initial_state=initial_state,
+            mixer=mixer,
+            initial_point=initial_point,
             pass_manager=pm
+        )
+        maybe_export_qaoa_circuit(
+            cost_operator=cost_operator,
+            reps=reps,
+            initial_state=initial_state,
+            mixer=mixer,
+            initial_point=initial_point,
+            label=f"qaoa_qubo_hardware_{num_qubits}q_p{reps}",
+            pass_manager=pm,
         )
 
         # Wrap QAOA as an optimizer for QuadraticProgram
         solver = MinimumEigenOptimizer(qaoa)
 
         # Solve
-        result = solver.solve(qp)
+        result = solver.solve(qubo)
     
     else:
-        qubo = QuadraticProgramToQubo().convert(qp)
-        num_qubits = len(qubo.variables)
-        expected_qubits = n * color_bit_width(k)
-        if num_qubits != expected_qubits:
-            raise ValueError(
-                f"The QUBO formulation expanded to {num_qubits} variables, but the custom initial state and mixer are "
-                f"built for the direct space-efficient encoding with {expected_qubits} qubits. "
-                "If you intended to use the direct Hamiltonian, call pauli_grouping(..., ham_repr=True)."
-            )
-        initial_point = [0.1] * (2 * reps)
-
         if num_qubits <= 20:
             qaoa = QAOA(
                 sampler=StatevectorSampler(),
                 optimizer=COBYLA(maxiter=200),
                 reps=reps,
-                initial_state=binary_initial_state(n, k),
-                mixer=gray_code_mixer(n, k, beta=Parameter("beta")),
+                initial_state=initial_state,
+                mixer=mixer,
                 initial_point=initial_point,
+            )
+            maybe_export_qaoa_circuit(
+                cost_operator=cost_operator,
+                reps=reps,
+                initial_state=initial_state,
+                mixer=mixer,
+                initial_point=initial_point,
+                label=f"qaoa_qubo_statevector_{num_qubits}q_p{reps}",
             )
             optimizer = MinimumEigenOptimizer(qaoa)
             return optimizer.solve(qubo)
 
         backend_options = dict(
             method="matrix_product_state",
-            max_parallel_threads=int(os.environ.get("SLURM_CPUS_PER_TASK", "1")),
+            max_parallel_threads=64,
             matrix_product_state_max_bond_dimension=32,
             matrix_product_state_truncation_threshold=1e-8,
-            max_memory_mb=700000,
+            max_memory_mb=0,
         )
 
         spsa = SPSA(
@@ -833,9 +954,17 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
             ),
             optimizer=spsa,
             reps=reps,
-            initial_state=binary_initial_state(n, k),
-            mixer=gray_code_mixer(n, k, beta=Parameter("beta")),
+            initial_state=initial_state,
+            mixer=mixer,
             initial_point=initial_point,
+        )
+        maybe_export_qaoa_circuit(
+            cost_operator=cost_operator,
+            reps=reps,
+            initial_state=initial_state,
+            mixer=mixer,
+            initial_point=initial_point,
+            label=f"qaoa_qubo_aer_{num_qubits}q_p{reps}",
         )
 
         optimizer = MinimumEigenOptimizer(qaoa)
@@ -844,18 +973,18 @@ def run_qaoa(qp: QuadraticProgram, reps: int, n: int, k: int, optimization_level
 
 def run_qaoa_H(H, n, k, reps=2, service: QiskitRuntimeService | None = None, optimization_level: int = 2, simulation: bool = True):
     algorithm_globals.random_seed = 42
-    initial_point = [0.1] * (2 * reps)
-    initial_state = binary_initial_state(n, k)
-    mixer = gray_code_mixer(n, k, beta=Parameter("beta"))
+    optimizer, initial_state, mixer, initial_point = build_binary_qaoa_components(n, k, reps)
     validate_direct_qaoa_dimensions(H, n, k, initial_state=initial_state, mixer=mixer)
     print('Number of qubits:', H.num_qubits)
 
     if simulation == False:
-        backend = service.least_busy(simulator=False)
+        if service is None:
+            raise ValueError("A QiskitRuntimeService instance is required when simulation=False.")
+
+        backend = service.least_busy(simulator=False, operational=True, min_num_qubits=H.num_qubits)
         print(backend)
 
         sampler = Sampler(mode=backend)
-        optimizer = SPSA(maxiter=100)
         pm = generate_preset_pass_manager(
             backend=backend,
             optimization_level=optimization_level,
@@ -872,6 +1001,15 @@ def run_qaoa_H(H, n, k, reps=2, service: QiskitRuntimeService | None = None, opt
             mixer=mixer,
             initial_point=initial_point,
         )
+        maybe_export_qaoa_circuit(
+            cost_operator=H,
+            reps=reps,
+            initial_state=initial_state,
+            mixer=mixer,
+            initial_point=initial_point,
+            label=f"qaoa_hamiltonian_hardware_{H.num_qubits}q_p{reps}",
+            pass_manager=pm,
+        )
         return qaoa.compute_minimum_eigenvalue(H)
 
     if H.num_qubits <= 20:
@@ -883,14 +1021,22 @@ def run_qaoa_H(H, n, k, reps=2, service: QiskitRuntimeService | None = None, opt
             mixer=mixer,
             initial_point=initial_point,
         )
+        maybe_export_qaoa_circuit(
+            cost_operator=H,
+            reps=reps,
+            initial_state=initial_state,
+            mixer=mixer,
+            initial_point=initial_point,
+            label=f"qaoa_hamiltonian_statevector_{H.num_qubits}q_p{reps}",
+        )
         return qaoa.compute_minimum_eigenvalue(H)
 
     backend_options = dict(
         method="matrix_product_state",
-        max_parallel_threads=int(os.environ.get("SLURM_CPUS_PER_TASK", "1")),
+        max_parallel_threads=64,
         matrix_product_state_max_bond_dimension=32,
         matrix_product_state_truncation_threshold=1e-8,
-        max_memory_mb=700000,
+        max_memory_mb=0,
     )
 
     spsa = SPSA(
@@ -911,6 +1057,14 @@ def run_qaoa_H(H, n, k, reps=2, service: QiskitRuntimeService | None = None, opt
         initial_state=initial_state,
         mixer=mixer,
         initial_point=initial_point,
+    )
+    maybe_export_qaoa_circuit(
+        cost_operator=H,
+        reps=reps,
+        initial_state=initial_state,
+        mixer=mixer,
+        initial_point=initial_point,
+        label=f"qaoa_hamiltonian_aer_{H.num_qubits}q_p{reps}",
     )
 
     return qaoa.compute_minimum_eigenvalue(H)
@@ -943,16 +1097,33 @@ def get_results(pauli_grouping_info: PauliGroupingInfo, job_result: dict | None 
 # Running QAOA on a QPU #
 #########################
 
-def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, optimization_level: int, api_key: str, simulation: bool = True, ham_repr: bool = False):
+def pauli_grouping(
+    paulis: SparsePauliOp,
+    C: int,
+    D: int,
+    k: int,
+    reps: int,
+    optimization_level: int,
+    api_key: str,
+    simulation: bool = True,
+    ham_repr: bool = False,
+    remove_fully_commuting_terms_enabled: bool | None = None,
+):
     '''
     Group the Pauli words in a SparsePauliOp object into QWC groups.
     Returns a list of lists, where each inner list contains the indices of the Pauli words that belong to the same QWC group.
     '''
 
-    A, active_vertices, universally_commuting_vertices = split_universally_commuting_terms(paulis)
+    if resolve_remove_fully_commuting_terms(remove_fully_commuting_terms_enabled):
+        A, active_vertices, universally_commuting_vertices = split_universally_commuting_terms(paulis)
+    else:
+        A = generate_qwc_graph(paulis)
+        active_vertices = [index for index in range(len(A))]
+        universally_commuting_vertices = []
+
     A_comp = complement_graph(A)
     active_paulis = sparse_pauli_subset(paulis, active_vertices) if active_vertices else None
-    active_A = [[A[i][j] for j in active_vertices] for i in active_vertices]
+    active_A = subgraph_from_indices(A, active_vertices)
     active_A_comp = complement_graph(active_A)
 
     pauli_grouping_info = PauliGroupingInfo(
@@ -972,13 +1143,6 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
         universally_commuting_vertices=universally_commuting_vertices,
     )
     
-    service = None
-    if simulation == False:
-        service = QiskitRuntimeService(
-            channel="ibm_quantum_platform",
-            token=api_key
-        )
-
     if not active_vertices:
         populate_grouping_summary(pauli_grouping_info, [], [])
         if ham_repr:
@@ -997,6 +1161,13 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
                 prettyprint=lambda: "All Pauli terms commute with one another; no QAOA run was required.",
             ),
         )
+
+    service = None
+    if simulation == False:
+        service_kwargs = {"channel": "ibm_quantum_platform"}
+        if api_key:
+            service_kwargs["token"] = api_key
+        service = QiskitRuntimeService(**service_kwargs)
     
     if ham_repr:
         H = build_cost_hamiltonian(
@@ -1027,7 +1198,15 @@ def pauli_grouping(paulis: SparsePauliOp, C: int, D: int, k: int, reps: int, opt
         # Keep the QUBO path isolated from the direct-Hamiltonian path so the
         # operator ansatz cannot accidentally inherit the quadratized problem size.
         qp = space_efficient_qp(active_A_comp, num_colors=k)
-        result = run_qaoa(qp, reps, len(active_vertices), k, optimization_level, service)
+        result = run_qaoa(
+            qp,
+            reps,
+            len(active_vertices),
+            k,
+            optimization_level,
+            service,
+            simulation=simulation,
+        )
         assignment = getattr(result, "x", None)
         if assignment is not None:
             colours, invalid_vertices = decode_assignment_bits(
